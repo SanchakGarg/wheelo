@@ -76,6 +76,10 @@ float pidIntegral      = 0.0f;
 float pidPrevMeas      = 0.0f;
 float pidOutput        = 0.0f;
 uint32_t pidLastUs     = 0;
+// Gimbal position accumulator (degrees offset from default).
+// PID output feeds this each loop; it self-centres so the gimbal never saturates.
+float gimbalAccum      = 0.0f;
+static const float GIMBAL_ACCUM_RATE   = 800.0f;  // tune: lower = faster gimbal swing
 static const float KP_MAX              = 50.0f;
 static const float KI_MAX              = 10.0f;
 static const float KD_MAX              = 50.0f;
@@ -301,7 +305,13 @@ static void vibCalibrate(int samples = 500) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  PID controller — runs at 50 Hz when autoBalance is true
+//  PID controller — runs at 500 Hz when autoBalance is true
+//
+//  Gimbal velocity mode (SetpointAccum):
+//    pidOutput feeds into gimbalAccum each loop instead of directly
+//    commanding a position. gimbalAccum self-centres so the gimbal keeps
+//    cycling and generating continuous torque rather than parking at an
+//    offset and going silent.
 // ═══════════════════════════════════════════════════════════════════════════
 
 static void runPid() {
@@ -312,12 +322,13 @@ static void runPid() {
     autoBalance = false;
     moveServoTo(servoDefaultPos);
     pidIntegral = 0.0f;
+    gimbalAccum = 0.0f;
     Serial.printf("[PID] Safety cut at %.1f deg\n", dispRoll);
     return;
   }
 
   uint32_t now = micros();
-  float dt = (pidLastUs == 0) ? 0.02f : constrain((now - pidLastUs) / 1e6f, 0.001f, 0.1f);
+  float dt = (pidLastUs == 0) ? 0.002f : constrain((now - pidLastUs) / 1e6f, 0.0001f, 0.1f);
   pidLastUs = now;
 
   float error   = pidSetpoint - dispRoll;
@@ -335,11 +346,16 @@ static void runPid() {
   float dMeas   = (dispRoll - pidPrevMeas) / dt;
   pidPrevMeas   = dispRoll;
 
-  // Output is in degrees of servo motion; convert to counts for the servo command.
   pidOutput = kp * error + ki * pidIntegral - kd * dMeas;
   pidOutput = constrain(pidOutput, -PID_OUTPUT_MAX_DEG, PID_OUTPUT_MAX_DEG);
 
-  moveServoTo(servoDefaultPos - (int)(pidOutput / SERVO_DEG_PER_COUNT));
+  // Velocity mode: accumulate output into gimbal target (degrees from default).
+  // Dividing by GIMBAL_ACCUM_RATE converts output magnitude to a slow ramp so
+  // the gimbal doesn't slam to an extreme. The clamp keeps it within swing limits.
+  gimbalAccum += pidOutput / GIMBAL_ACCUM_RATE;
+  gimbalAccum  = constrain(gimbalAccum, -PID_OUTPUT_MAX_DEG, PID_OUTPUT_MAX_DEG);
+
+  moveServoTo(servoDefaultPos - (int)(gimbalAccum / SERVO_DEG_PER_COUNT));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -497,6 +513,10 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
     <div class="mpu-cell">
       <div class="mpu-lbl">PID Output</div>
       <div class="mpu-num" id="bal-out">—</div>
+      <div class="mpu-unit">deg</div></div>
+    <div class="mpu-cell">
+      <div class="mpu-lbl">Gimbal Accum</div>
+      <div class="mpu-num" id="bal-accum" style="color:#8855cc;">—</div>
       <div class="mpu-unit">deg</div></div>
     <div class="mpu-cell">
       <div class="mpu-lbl">Servo Pos</div>
@@ -908,23 +928,25 @@ document.getElementById('set-angles-btn').addEventListener('click', async () => 
 });
 
 // ── Auto-Balance PID ──────────────────────────────────────────────────────────
-const balToggle = document.getElementById('bal-toggle');
-const balStatus = document.getElementById('bal-status');
-const balErrEl  = document.getElementById('bal-err');
-const balOutEl  = document.getElementById('bal-out');
-const balSrvEl  = document.getElementById('bal-srv');
-const pidKpEl   = document.getElementById('pid-kp');
-const pidKiEl   = document.getElementById('pid-ki');
-const pidKdEl   = document.getElementById('pid-kd');
-const pidSpEl   = document.getElementById('pid-sp');
+const balToggle  = document.getElementById('bal-toggle');
+const balStatus  = document.getElementById('bal-status');
+const balErrEl   = document.getElementById('bal-err');
+const balOutEl   = document.getElementById('bal-out');
+const balAccumEl = document.getElementById('bal-accum');
+const balSrvEl   = document.getElementById('bal-srv');
+const pidKpEl    = document.getElementById('pid-kp');
+const pidKiEl    = document.getElementById('pid-ki');
+const pidKdEl    = document.getElementById('pid-kd');
+const pidSpEl    = document.getElementById('pid-sp');
 let   balRunning     = false;
 let   balGainsLoaded = false;  // gains only synced from server once at startup
 
 function updateBalUI(j) {
   balRunning = j.running;
-  if (j.error    !== undefined) balErrEl.textContent = j.error.toFixed(2);
-  if (j.output   !== undefined) balOutEl.textContent = j.output.toFixed(1);
-  if (j.servoPos !== undefined) balSrvEl.textContent = j.servoPos;
+  if (j.error      !== undefined) balErrEl.textContent   = j.error.toFixed(2);
+  if (j.output     !== undefined) balOutEl.textContent   = j.output.toFixed(1);
+  if (j.gimbalAccum!== undefined) balAccumEl.textContent = j.gimbalAccum.toFixed(2);
+  if (j.servoPos   !== undefined) balSrvEl.textContent   = j.servoPos;
   // Only overwrite the gain inputs once — after that, the user owns those fields.
   if (!balGainsLoaded && j.kp !== undefined) {
     pidKpEl.value = j.kp.toFixed(4);
@@ -1129,6 +1151,7 @@ static void handleBalanceStart() {
   if (!mpuOk) { server.send(503, "text/plain", "MPU not found"); return; }
   autoBalance = true;
   pidIntegral = 0.0f;
+  gimbalAccum = 0.0f;
   pidPrevMeas = cfRoll + rollOffset;
   pidLastUs   = 0;
   server.send(200, "application/json", "{\"running\":true}");
@@ -1137,6 +1160,7 @@ static void handleBalanceStart() {
 static void handleBalanceStop() {
   autoBalance = false;
   pidIntegral = 0.0f;
+  gimbalAccum = 0.0f;
   moveServoTo(servoDefaultPos);
   server.send(200, "application/json", "{\"running\":false}");
 }
@@ -1161,12 +1185,12 @@ static void handleBalancePid() {
 
 static void handleBalanceState() {
   float dispRoll = cfRoll + rollOffset;
-  char buf[180];
+  char buf[220];
   snprintf(buf, sizeof(buf),
-    "{\"running\":%s,\"error\":%.2f,\"output\":%.1f,\"servoPos\":%d"
+    "{\"running\":%s,\"error\":%.2f,\"output\":%.1f,\"gimbalAccum\":%.2f,\"servoPos\":%d"
     ",\"kp\":%.4f,\"ki\":%.4f,\"kd\":%.4f,\"setpoint\":%.4f}",
     autoBalance ? "true" : "false",
-    pidSetpoint - dispRoll, pidOutput, servoTargetPos,
+    pidSetpoint - dispRoll, pidOutput, gimbalAccum, servoTargetPos,
     pidKp, pidKi, pidKd, pidSetpoint);
   server.send(200, "application/json", buf);
 }
