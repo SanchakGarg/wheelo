@@ -74,6 +74,8 @@ void BalancePID::compute() {
 void BalancePID::setGains(float newKp, float newKi, float newKd, float newSp,
                           Preferences& prefs) {
     kp = newKp; ki = newKi; kd = newKd; setpoint = newSp;
-    _integral = 0.0f;
+    _integral   = 0.0f;
+    gimbalAccum = 0.0f;
+    _servo.moveTo(_servo.defaultPos);
     saveGains(prefs);
 }
