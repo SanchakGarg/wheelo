@@ -169,7 +169,7 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
       <div style="font-size:9px;color:var(--muted);">Kp &mdash; proportional</div>
       <div style="display:flex;gap:3px;">
         <button class="pid-step" data-id="pid-kp" data-step="-0.05" style="padding:7px 9px;">&#9660;</button>
-        <input id="pid-kp" type="number" step="any" min="0" max="1" value="0.20" inputmode="decimal" style="text-align:center;"/>
+        <input id="pid-kp" type="number" step="any" min="0" max="1" value="0.35" inputmode="decimal" style="text-align:center;"/>
         <button class="pid-step" data-id="pid-kp" data-step="0.05" style="padding:7px 9px;">&#9650;</button>
       </div>
     </div>
@@ -185,7 +185,7 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
       <div style="font-size:9px;color:var(--muted);">Kd &mdash; derivative</div>
       <div style="display:flex;gap:3px;">
         <button class="pid-step" data-id="pid-kd" data-step="-0.05" style="padding:7px 9px;">&#9660;</button>
-        <input id="pid-kd" type="number" step="any" min="0" max="1" value="0.04" inputmode="decimal" style="text-align:center;"/>
+        <input id="pid-kd" type="number" step="any" min="0" max="1" value="0.10" inputmode="decimal" style="text-align:center;"/>
         <button class="pid-step" data-id="pid-kd" data-step="0.05" style="padding:7px 9px;">&#9650;</button>
       </div>
     </div>
@@ -205,13 +205,54 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
     <div></div>
   </div>
 
+  <!-- PID range reference -->
+  <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:10px;">
+    <div style="background:#0d1520;padding:7px 12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-size:9px;">
+      Gain ranges &amp; recommended
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="background:#0a0f18;color:var(--muted);font-size:9px;letter-spacing:.08em;">
+          <th style="padding:5px 10px;text-align:left;border-bottom:1px solid var(--border);">Gain</th>
+          <th style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border);">Min</th>
+          <th style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border);">Max</th>
+          <th style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border);color:#52c87a;">Start</th>
+          <th style="padding:5px 10px;text-align:left;border-bottom:1px solid var(--border);">Effect at start value</th>
+        </tr>
+      </thead>
+      <tbody style="color:var(--text2);">
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 10px;color:var(--text);font-weight:700;">Kp</td>
+          <td style="padding:6px 10px;text-align:center;">0.10</td>
+          <td style="padding:6px 10px;text-align:center;">0.70</td>
+          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">0.35</td>
+          <td style="padding:6px 10px;">1&deg; tilt &rarr; gimbal ramps at ~11&deg;/s</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 10px;color:var(--text);font-weight:700;">Ki</td>
+          <td style="padding:6px 10px;text-align:center;">0.00</td>
+          <td style="padding:6px 10px;text-align:center;">0.03</td>
+          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">0.00</td>
+          <td style="padding:6px 10px;">Add last. +0.1&deg; output per second of 1&deg; lean</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 10px;color:var(--text);font-weight:700;">Kd</td>
+          <td style="padding:6px 10px;text-align:center;">0.05</td>
+          <td style="padding:6px 10px;text-align:center;">0.15</td>
+          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">0.10</td>
+          <td style="padding:6px 10px;">10&deg;/s rotation &rarr; 6&deg;/s braking on accum</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
   <div style="font-size:10px;color:var(--muted);line-height:1.85;border-top:1px solid var(--border);padding-top:10px;">
     <b style="color:#ff9900;">&#9650; Before starting:</b> hold the robot in its balance pose &rarr; press <b style="color:var(--text2);">Reset Angles</b> below so Roll reads 0&deg; &rarr; then hit START.<br/><br/>
     <b style="color:var(--text2);">How PID works:</b><br/>
     &bull; <b style="color:var(--text2);">P</b> (Kp): robot tilts &rarr; gimbal ramps proportionally. Higher = stronger ramp rate.<br/>
     &bull; <b style="color:var(--text2);">D</b> (Kd): brakes the gimbal accumulator as the robot swings back. Critical — add before raising Kp.<br/>
     &bull; <b style="color:var(--text2);">I</b> (Ki): slowly cancels a permanent lean. Keep tiny — too much causes drift.<br/><br/>
-    <b style="color:var(--text2);">Tuning recipe:</b> Kp=0.35 Ki=0 Kd=0.10 &rarr; raise Kp until shaking &rarr; raise Kd to damp &rarr; tiny Ki to fix lean.
+    <b style="color:var(--text2);">Tuning recipe:</b> start at Kp=0.35 Kd=0.10 Ki=0 &rarr; raise Kp until shaking &rarr; raise Kd to damp &rarr; tiny Ki to fix lean.
   </div>
 </div>
 

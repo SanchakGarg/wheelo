@@ -1,9 +1,13 @@
 #pragma once
 #include <Arduino.h>
 
-#define WIFI_SSID   "Makerspace"
-#define WIFI_PASS   "testbricks"
-#define NVS_NS      "wheelo"
+#define WIFI_SSID     "Makerspace"
+#define WIFI_PASS     "testbricks"
+#define NVS_NS        "wheelo"
+
+// OTA
+#define OTA_HOSTNAME  "wheelo"
+#define OTA_PASSWORD  "wheelo123"
 
 // ESC — D10 / GPIO10
 inline constexpr int      PIN_ESC      = 10;

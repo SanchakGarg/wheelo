@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <Preferences.h>
+#include <ArduinoOTA.h>
 #include "config.h"
 #include "ESCController.h"
 #include "ServoController.h"
@@ -46,9 +47,24 @@ void setup() {
 
     ui.begin();
     Serial.println("HTTP server started.");
+
+    // OTA
+    ArduinoOTA.setHostname(OTA_HOSTNAME);
+    ArduinoOTA.setPassword(OTA_PASSWORD);
+    ArduinoOTA.onStart([](){ Serial.println("OTA start"); });
+    ArduinoOTA.onEnd([](){ Serial.println("\nOTA done"); });
+    ArduinoOTA.onProgress([](unsigned int prog, unsigned int total){
+        Serial.printf("OTA: %u%%\r", prog * 100 / total);
+    });
+    ArduinoOTA.onError([](ota_error_t err){
+        Serial.printf("OTA error[%u]\n", err);
+    });
+    ArduinoOTA.begin();
+    Serial.printf("OTA ready — hostname: %s\n", OTA_HOSTNAME);
 }
 
 void loop() {
+    ArduinoOTA.handle();
     ui.handle();
 
     // Drain servo echo bytes
