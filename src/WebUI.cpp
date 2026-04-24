@@ -153,7 +153,7 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
       <div class="mpu-num" id="bal-out">—</div>
       <div class="mpu-unit">deg</div></div>
     <div class="mpu-cell">
-      <div class="mpu-lbl">Gimbal Accum</div>
+      <div class="mpu-lbl">SP Accum</div>
       <div class="mpu-num" id="bal-accum" style="color:#8855cc;">—</div>
       <div class="mpu-unit">deg</div></div>
     <div class="mpu-cell">
@@ -528,7 +528,7 @@ function updateBalUI(j){
   balRunning=j.running;
   if(j.error!==undefined)     balErrEl.textContent=j.error.toFixed(2);
   if(j.output!==undefined)    balOutEl.textContent=j.output.toFixed(1);
-  if(j.gimbalAccum!==undefined)balAccumEl.textContent=j.gimbalAccum.toFixed(2);
+  if(j.spAccum!==undefined)balAccumEl.textContent=j.spAccum.toFixed(2);
   if(j.servoPos!==undefined)  balSrvEl.textContent=j.servoPos;
   if(!balGainsLoaded&&j.kp!==undefined){
     pidKpEl.value=j.kp.toFixed(4); pidKiEl.value=j.ki.toFixed(4);
@@ -734,10 +734,10 @@ void WebUI::handleBalanceState() {
     float dispRoll = _mpu.cfRoll + _mpu.rollOffset;
     char buf[220];
     snprintf(buf, sizeof(buf),
-        "{\"running\":%s,\"error\":%.2f,\"output\":%.1f,\"gimbalAccum\":%.2f,\"servoPos\":%d"
+        "{\"running\":%s,\"error\":%.2f,\"output\":%.1f,\"spAccum\":%.2f,\"servoPos\":%d"
         ",\"kp\":%.4f,\"ki\":%.4f,\"kd\":%.4f,\"setpoint\":%.4f}",
         _pid.running ? "true" : "false",
-        _pid.setpoint - dispRoll, _pid.output, _pid.gimbalAccum, _servo.targetPos,
+        _pid.setpoint - dispRoll, _pid.output, _pid.setpointAccum, _servo.targetPos,
         _pid.kp, _pid.ki, _pid.kd, _pid.setpoint);
     _server.send(200, "application/json", buf);
 }
