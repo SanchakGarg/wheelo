@@ -166,37 +166,37 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
   <div class="panel-title">PID Gains &nbsp;<span style="font-size:9px;color:var(--muted);text-transform:none;letter-spacing:.02em;">direct values &nbsp;&#9660;&#9650; steps below</span></div>
   <div class="row">
     <div style="display:flex;flex-direction:column;gap:4px;">
-      <div style="font-size:9px;color:var(--muted);">Kp &mdash; proportional &nbsp;&#9660;&#9650;&nbsp;0.5</div>
+      <div style="font-size:9px;color:var(--muted);">Kp &mdash; proportional &nbsp;&#9660;&#9650;&nbsp;0.1</div>
       <div style="display:flex;gap:3px;">
-        <button class="pid-step" data-id="pid-kp" data-step="-0.5" style="padding:7px 9px;">&#9660;</button>
-        <input id="pid-kp" type="number" step="any" min="0" max="20" value="3.5" inputmode="decimal" style="text-align:center;"/>
-        <button class="pid-step" data-id="pid-kp" data-step="0.5" style="padding:7px 9px;">&#9650;</button>
+        <button class="pid-step" data-id="pid-kp" data-step="-0.1" style="padding:7px 9px;">&#9660;</button>
+        <input id="pid-kp" type="number" step="any" min="0" max="20" value="1.8" inputmode="decimal" style="text-align:center;"/>
+        <button class="pid-step" data-id="pid-kp" data-step="0.1" style="padding:7px 9px;">&#9650;</button>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:4px;">
-      <div style="font-size:9px;color:var(--muted);">Ki &mdash; integral &nbsp;&#9660;&#9650;&nbsp;0.5</div>
+      <div style="font-size:9px;color:var(--muted);">Ki &mdash; integral &nbsp;&#9660;&#9650;&nbsp;1</div>
       <div style="display:flex;gap:3px;">
-        <button class="pid-step" data-id="pid-ki" data-step="-0.5" style="padding:7px 9px;">&#9660;</button>
-        <input id="pid-ki" type="number" step="any" min="0" max="20" value="0.0" inputmode="decimal" style="text-align:center;"/>
-        <button class="pid-step" data-id="pid-ki" data-step="0.5" style="padding:7px 9px;">&#9650;</button>
+        <button class="pid-step" data-id="pid-ki" data-step="-1" style="padding:7px 9px;">&#9660;</button>
+        <input id="pid-ki" type="number" step="any" min="0" max="100" value="22.0" inputmode="decimal" style="text-align:center;"/>
+        <button class="pid-step" data-id="pid-ki" data-step="1" style="padding:7px 9px;">&#9650;</button>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:4px;">
-      <div style="font-size:9px;color:var(--muted);">Kd &mdash; derivative &nbsp;&#9660;&#9650;&nbsp;0.05</div>
+      <div style="font-size:9px;color:var(--muted);">Kd &mdash; derivative &nbsp;&#9660;&#9650;&nbsp;0.01</div>
       <div style="display:flex;gap:3px;">
-        <button class="pid-step" data-id="pid-kd" data-step="-0.05" style="padding:7px 9px;">&#9660;</button>
-        <input id="pid-kd" type="number" step="any" min="0" max="5" value="0.10" inputmode="decimal" style="text-align:center;"/>
-        <button class="pid-step" data-id="pid-kd" data-step="0.05" style="padding:7px 9px;">&#9650;</button>
+        <button class="pid-step" data-id="pid-kd" data-step="-0.01" style="padding:7px 9px;">&#9660;</button>
+        <input id="pid-kd" type="number" step="any" min="0" max="5" value="0.09" inputmode="decimal" style="text-align:center;"/>
+        <button class="pid-step" data-id="pid-kd" data-step="0.01" style="padding:7px 9px;">&#9650;</button>
       </div>
     </div>
   </div>
   <div class="row">
     <div style="display:flex;flex-direction:column;gap:4px;">
-      <div style="font-size:9px;color:var(--muted);">Setpoint (°)</div>
+      <div style="font-size:9px;color:var(--muted);">Trim (°) &mdash; balance point offset</div>
       <div style="display:flex;gap:3px;">
-        <button class="pid-step" data-id="pid-sp" data-step="-0.5" style="padding:7px 9px;">&#9660;</button>
-        <input id="pid-sp" type="number" step="0.5" min="-30" max="30" value="0.0" inputmode="decimal" style="text-align:center;"/>
-        <button class="pid-step" data-id="pid-sp" data-step="0.5" style="padding:7px 9px;">&#9650;</button>
+        <button class="pid-step" data-id="pid-sp" data-step="-0.1" style="padding:7px 9px;">&#9660;</button>
+        <input id="pid-sp" type="number" step="0.1" min="-30" max="30" value="0.0" inputmode="decimal" style="text-align:center;"/>
+        <button class="pid-step" data-id="pid-sp" data-step="0.1" style="padding:7px 9px;">&#9650;</button>
       </div>
     </div>
     <div style="display:flex;align-items:flex-end;">
@@ -222,78 +222,69 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
       <tbody style="color:var(--text2);">
         <tr style="border-bottom:1px solid var(--border);">
           <td style="padding:6px 10px;color:var(--text);font-weight:700;">Kp</td>
-          <td style="padding:6px 10px;text-align:center;">1 &ndash; 15</td>
-          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">3.5</td>
-          <td style="padding:6px 10px;">1&deg; tilt &rarr; 3.5&deg; direct servo deflection</td>
+          <td style="padding:6px 10px;text-align:center;">1 &ndash; 5</td>
+          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">1.8</td>
+          <td style="padding:6px 10px;">1&deg; tilt &rarr; 1.8&deg; servo deflection</td>
         </tr>
         <tr style="border-bottom:1px solid var(--border);">
           <td style="padding:6px 10px;color:var(--text);font-weight:700;">Ki</td>
-          <td style="padding:6px 10px;text-align:center;">0 &ndash; 5</td>
-          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">0.0</td>
-          <td style="padding:6px 10px;">Add last. Fixes lean P cannot cancel. Keep &lt; 1</td>
+          <td style="padding:6px 10px;text-align:center;">0 &ndash; 50</td>
+          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">22.0</td>
+          <td style="padding:6px 10px;">Scaled for 10ms sample: ki_int = Ki &times; 0.01</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 10px;color:var(--text);font-weight:700;">Kd</td>
+          <td style="padding:6px 10px;text-align:center;">0.01 &ndash; 0.5</td>
+          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">0.09</td>
+          <td style="padding:6px 10px;">Scaled for 10ms sample: kd_int = Kd / 0.01</td>
         </tr>
         <tr>
-          <td style="padding:6px 10px;color:var(--text);font-weight:700;">Kd</td>
-          <td style="padding:6px 10px;text-align:center;">0.05 &ndash; 2</td>
-          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">0.10</td>
-          <td style="padding:6px 10px;">10&deg;/s rotation &rarr; 1&deg; braking on servo</td>
+          <td style="padding:6px 10px;color:var(--text);font-weight:700;">Trim</td>
+          <td style="padding:6px 10px;text-align:center;">&minus;5 &ndash; 5</td>
+          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">0.0</td>
+          <td style="padding:6px 10px;">Balance-point offset. Adjust until robot holds still.</td>
         </tr>
       </tbody>
     </table>
   </div>
 
   <div style="font-size:10px;color:var(--muted);line-height:1.85;border-top:1px solid var(--border);padding-top:10px;">
-    <b style="color:#ff9900;">&#9650; Before starting:</b> hold the robot in its balance pose &rarr; press <b style="color:var(--text2);">Reset Angles</b> below so Roll reads 0&deg; &rarr; then hit START.<br/><br/>
-    <b style="color:var(--text2);">How PID works (direct position mode):</b><br/>
-    &bull; <b style="color:var(--text2);">P</b> (Kp): tilt angle &rarr; servo deflects proportionally. Bigger lean = bigger deflection. Too high = shaking.<br/>
-    &bull; <b style="color:var(--text2);">D</b> (Kd): brakes the servo as the robot swings back. Prevents overshoot. Add before raising Kp.<br/>
-    &bull; <b style="color:var(--text2);">I</b> (Ki): fixes a persistent lean P alone can&apos;t cancel. Keep tiny — causes runaway if too high.<br/><br/>
-    <b style="color:var(--text2);">Tuning recipe:</b> Kp=3.5 Ki=0 Kd=0.10 &rarr; raise Kp until shaking &rarr; raise Kd to damp &rarr; tiny Ki last.
+    <b style="color:#ff9900;">&#9650; Before starting:</b> hold robot in balance pose &rarr; press <b style="color:var(--text2);">Zero Angle</b> in MPU panel so Angle reads 0&deg; &rarr; adjust Trim until stable &rarr; hit START.<br/><br/>
+    <b style="color:var(--text2);">Algorithm (XRobots V2, PID_v1-equivalent, 10ms fixed rate):</b><br/>
+    &bull; ki_int = Ki &times; 0.01 &nbsp;|&nbsp; kd_int = Kd / 0.01 (pre-scaled by sample time)<br/>
+    &bull; integral clamps to &plusmn;35&deg;, output clamps to &plusmn;35&deg;<br/>
+    &bull; SetpointAccum drifts &plusmn;0.5&deg; slowly to re-centre gimbal<br/><br/>
+    <b style="color:var(--text2);">Tuning recipe:</b> Start Kp=1.8 Ki=22 Kd=0.09 &rarr; adjust Trim first &rarr; raise Kp if sluggish &rarr; raise Kd if oscillating.
   </div>
 </div>
 
 <!-- MPU6050 -->
 <div class="panel full">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-    <div class="panel-title">&#11835; MPU6050 &nbsp;<span id="mpu-status" style="color:var(--muted)">connecting…</span></div>
+    <div class="panel-title">&#11835; MPU6050 DMP &nbsp;<span id="mpu-status" style="color:var(--muted)">connecting…</span></div>
     <div style="display:flex;gap:8px;">
       <button id="mpu-cal-btn" class="prim" style="font-size:10px;padding:7px 12px;">Bias Cal</button>
-      <button id="mpu-vib-btn" style="font-size:10px;padding:7px 12px;background:#2a1f3a;border-color:#8855cc;color:#aa77ee;">Vib Cal</button>
     </div>
   </div>
   <div id="mpu-cal-msg" style="font-size:11px;color:var(--muted);display:none;"></div>
 
-  <div class="mpu-grid">
-    <div class="mpu-cell"><div class="mpu-lbl">Gyro X</div>
-      <div class="mpu-num" id="m-gx">—</div><div class="mpu-unit">°/s</div></div>
-    <div class="mpu-cell"><div class="mpu-lbl">Gyro Y</div>
-      <div class="mpu-num" id="m-gy">—</div><div class="mpu-unit">°/s</div></div>
-    <div class="mpu-cell"><div class="mpu-lbl">Gyro Z</div>
-      <div class="mpu-num" id="m-gz">—</div><div class="mpu-unit">°/s</div></div>
+  <div class="mpu-grid" style="grid-template-columns:repeat(2,1fr);">
     <div class="mpu-cell" style="border-color:#ff9900aa;">
-      <div class="mpu-lbl" style="color:#ff9900;">Roll</div>
-      <div class="mpu-num" id="m-roll" style="color:#ff9900;">—</div>
-      <div class="mpu-unit">deg</div></div>
-    <div class="mpu-cell" style="border-color:#00ccccaa;">
-      <div class="mpu-lbl" style="color:#00cccc;">Pitch</div>
-      <div class="mpu-num" id="m-pitch" style="color:#00cccc;">—</div>
+      <div class="mpu-lbl" style="color:#ff9900;">Angle (Pitch)</div>
+      <div class="mpu-num" id="m-angle" style="color:#ff9900;font-size:28px;">—</div>
       <div class="mpu-unit">deg</div></div>
     <div class="mpu-cell" style="padding:6px;">
       <button id="reset-angles-btn" style="width:100%;height:100%;font-size:9px;
         letter-spacing:.08em;background:#1a2030;border-color:#3a4a5a;color:#5a7a9a;
-        border-radius:5px;cursor:pointer;padding:4px;">Reset<br/>Angles</button>
+        border-radius:5px;cursor:pointer;padding:4px;">Zero<br/>Angle</button>
     </div>
   </div>
 
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-    <span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap;">Set angles:</span>
-    <input id="init-roll"  type="number" step="0.1" min="-360" max="360" placeholder="Roll °"
+    <span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap;">Set angle:</span>
+    <input id="init-angle" type="number" step="0.1" min="-360" max="360" placeholder="Angle °"
       inputmode="decimal"
       style="flex:1;min-width:70px;background:var(--bg);color:#ff9900;border:1px solid #ff990066;
-             border-radius:6px;padding:7px 8px;font-size:13px;font-family:inherit;"/>
-    <input id="init-pitch" type="number" step="0.1" min="-360" max="360" placeholder="Pitch °"
-      inputmode="decimal"
-      style="flex:1;min-width:70px;background:var(--bg);color:#00cccc;border:1px solid #00cccc66;
              border-radius:6px;padding:7px 8px;font-size:13px;font-family:inherit;"/>
     <button id="set-angles-btn" class="prim" style="font-size:10px;padding:7px 14px;white-space:nowrap;">Set</button>
   </div>
@@ -305,10 +296,9 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
   </div>
 
   <div class="graph-wrap">
-    <div class="graph-title">Orientation — Complementary Filter &nbsp;<span style="color:var(--muted)">(auto-scale °)</span></div>
+    <div class="graph-title">Angle — DMP Pitch &nbsp;<span style="color:var(--muted)">(auto-scale °)</span></div>
     <div class="graph-legend">
-      <div class="legend-item"><div class="legend-dot" style="background:#ff9900"></div>Roll</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#00cccc"></div>Pitch</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ff9900"></div>Angle</div>
     </div>
     <canvas id="gyro-graph"></canvas>
   </div>
@@ -456,13 +446,12 @@ function makeGraph(canvasId,channels,minRange){
   }
   return{push,draw};
 }
-const gyroGraph=makeGraph('gyro-graph',[{color:'#ff9900'},{color:'#00cccc'}],5);
+const gyroGraph=makeGraph('gyro-graph',[{color:'#ff9900'}],5);
 
 const mpuStatus=document.getElementById('mpu-status');
 const mpuCalMsg=document.getElementById('mpu-cal-msg');
 const mpuCalBtn=document.getElementById('mpu-cal-btn');
 const vertBanner=document.getElementById('vertical-banner');
-const mpuIds=['m-gx','m-gy','m-gz'];
 
 async function fetchMpu(){
   try{
@@ -471,11 +460,9 @@ async function fetchMpu(){
     else if(j.cal){mpuStatus.textContent='calibrating…';mpuStatus.style.color='var(--blue)';}
     else{
       mpuStatus.textContent='live'; mpuStatus.style.color='var(--green)';
-      [j.gx,j.gy,j.gz].forEach((v,i)=>document.getElementById(mpuIds[i]).textContent=v.toFixed(2));
-      document.getElementById('m-roll').textContent=j.roll.toFixed(1);
-      document.getElementById('m-pitch').textContent=j.pitch.toFixed(1);
+      document.getElementById('m-angle').textContent=j.angle.toFixed(2);
       vertBanner.style.display=j.vertical?'block':'none';
-      gyroGraph.push([j.roll,j.pitch]);
+      gyroGraph.push([j.angle]);
     }
   }catch(e){}
   setTimeout(fetchMpu,80);
@@ -484,31 +471,27 @@ fetchMpu();
 function renderLoop(){gyroGraph.draw();requestAnimationFrame(renderLoop);}
 requestAnimationFrame(renderLoop);
 
-const mpuVibBtn=document.getElementById('mpu-vib-btn');
 async function runCal(url,msg,successMsg){
-  mpuCalBtn.disabled=true; mpuVibBtn.disabled=true;
+  mpuCalBtn.disabled=true;
   mpuCalMsg.textContent=msg; mpuCalMsg.style.display='block';
   mpuStatus.textContent='calibrating…'; mpuStatus.style.color='var(--blue)';
   try{const r=await fetch(url),j=await r.json();if(j.done)toast(successMsg);}
   catch(e){toast('Failed — check connection');}
   mpuCalMsg.style.display='none';
   mpuStatus.textContent='live'; mpuStatus.style.color='var(--green)';
-  mpuCalBtn.disabled=false; mpuVibBtn.disabled=false;
+  mpuCalBtn.disabled=false;
 }
 mpuCalBtn.addEventListener('click',()=>
-  runCal('/mpu/calibrate','Bias cal — keep flat & still (~2 s)…','Bias calibrated ✓ saved'));
-mpuVibBtn.addEventListener('click',()=>
-  runCal('/mpu/vibcal','Vib cal — measuring noise floor (~2 s)…','Vib noise floor saved ✓'));
+  runCal('/mpu/calibrate','Bias cal — keep flat & still (~2 s)…','Bias saved ✓'));
 document.getElementById('reset-angles-btn').addEventListener('click',async()=>{
-  try{await fetch('/mpu/resetangles');toast('Angles reset to 0°');}catch(e){}
+  try{await fetch('/mpu/resetangles');toast('Angle zeroed');}catch(e){}
 });
 document.getElementById('set-angles-btn').addEventListener('click',async()=>{
-  const roll=parseFloat(document.getElementById('init-roll').value);
-  const pitch=parseFloat(document.getElementById('init-pitch').value);
-  if(isNaN(roll)||isNaN(pitch)){toast('Enter both Roll and Pitch');return;}
+  const angle=parseFloat(document.getElementById('init-angle').value);
+  if(isNaN(angle)){toast('Enter angle');return;}
   try{
-    await fetch('/mpu/setangles?roll='+roll+'&pitch='+pitch);
-    toast('Angles set: Roll '+roll+'°  Pitch '+pitch+'°');
+    await fetch('/mpu/setangle?angle='+angle);
+    toast('Angle set: '+angle+'°');
   }catch(e){toast('Failed');}
 });
 
@@ -613,9 +596,8 @@ void WebUI::begin() {
     _server.on("/servo/setdefault", [this](){ handleServoSetDefault(); });
     _server.on("/mpu",              [this](){ handleMpu(); });
     _server.on("/mpu/calibrate",    [this](){ handleMpuCalibrate(); });
-    _server.on("/mpu/vibcal",       [this](){ handleMpuVibCal(); });
     _server.on("/mpu/resetangles",  [this](){ handleMpuResetAngles(); });
-    _server.on("/mpu/setangles",    [this](){ handleMpuSetAngles(); });
+    _server.on("/mpu/setangle",     [this](){ handleMpuSetAngle(); });
     _server.on("/balance/start",    [this](){ handleBalanceStart(); });
     _server.on("/balance/stop",     [this](){ handleBalanceStop(); });
     _server.on("/balance/pid",      [this](){ handleBalancePid(); });
@@ -660,18 +642,13 @@ void WebUI::handleServoSetDefault() {
 }
 
 void WebUI::handleMpu() {
-    float dispRoll  = _mpu.cfRoll  + _mpu.rollOffset;
-    float dispPitch = _mpu.cfPitch + _mpu.pitchOffset;
-    bool  vert = fabsf(dispRoll) > 70.0f || fabsf(dispPitch) > 70.0f;
-    char buf[220];
+    bool vert = fabsf(_mpu.angle) > 70.0f;
+    char buf[100];
     snprintf(buf, sizeof(buf),
-        "{\"ok\":%s,\"cal\":%s"
-        ",\"gx\":%.3f,\"gy\":%.3f,\"gz\":%.3f"
-        ",\"roll\":%.2f,\"pitch\":%.2f,\"vertical\":%s}",
+        "{\"ok\":%s,\"cal\":%s,\"angle\":%.2f,\"vertical\":%s}",
         _mpu.ok ? "true" : "false",
         _mpu.calibrating ? "true" : "false",
-        _mpu.filtered.gx, _mpu.filtered.gy, _mpu.filtered.gz,
-        dispRoll, dispPitch, vert ? "true" : "false");
+        _mpu.angle, vert ? "true" : "false");
     _server.send(200, "application/json", buf);
 }
 
@@ -682,27 +659,18 @@ void WebUI::handleMpuCalibrate() {
     _server.send(200, "application/json", "{\"done\":true}");
 }
 
-void WebUI::handleMpuVibCal() {
-    if (!_mpu.ok)          { _server.send(503, "text/plain", "MPU not found"); return; }
-    if (_mpu.calibrating)  { _server.send(409, "text/plain", "busy"); return; }
-    _mpu.vibCalibrate(_prefs);
-    _server.send(200, "application/json", "{\"done\":true}");
-}
-
 void WebUI::handleMpuResetAngles() {
-    _mpu.resetAngles(_prefs);
+    _mpu.resetAngle(_prefs);
     _server.send(200, "application/json", "{\"done\":true}");
 }
 
-void WebUI::handleMpuSetAngles() {
-    if (!_server.hasArg("roll") || !_server.hasArg("pitch")) {
-        _server.send(400, "text/plain", "missing roll or pitch"); return;
+void WebUI::handleMpuSetAngle() {
+    if (!_server.hasArg("angle")) {
+        _server.send(400, "text/plain", "missing angle"); return;
     }
-    _mpu.setAngles(_server.arg("roll").toFloat(), _server.arg("pitch").toFloat(), _prefs);
-    float dispRoll  = _mpu.cfRoll  + _mpu.rollOffset;
-    float dispPitch = _mpu.cfPitch + _mpu.pitchOffset;
-    char buf[70];
-    snprintf(buf, sizeof(buf), "{\"done\":true,\"roll\":%.2f,\"pitch\":%.2f}", dispRoll, dispPitch);
+    _mpu.setAngle(_server.arg("angle").toFloat(), _prefs);
+    char buf[60];
+    snprintf(buf, sizeof(buf), "{\"done\":true,\"angle\":%.2f}", _mpu.angle);
     _server.send(200, "application/json", buf);
 }
 
@@ -718,26 +686,26 @@ void WebUI::handleBalanceStop() {
 }
 
 void WebUI::handleBalancePid() {
-    float kp = _server.hasArg("kp") ? _server.arg("kp").toFloat() : _pid.kp;
-    float ki = _server.hasArg("ki") ? _server.arg("ki").toFloat() : _pid.ki;
-    float kd = _server.hasArg("kd") ? _server.arg("kd").toFloat() : _pid.kd;
-    float sp = _server.hasArg("sp") ? _server.arg("sp").toFloat() : _pid.setpoint;
-    _pid.setGains(kp, ki, kd, sp, _prefs);
+    float kp   = _server.hasArg("kp") ? _server.arg("kp").toFloat() : _pid.kp;
+    float ki   = _server.hasArg("ki") ? _server.arg("ki").toFloat() : _pid.ki;
+    float kd   = _server.hasArg("kd") ? _server.arg("kd").toFloat() : _pid.kd;
+    float trim = _server.hasArg("sp") ? _server.arg("sp").toFloat() : _pid.trim;
+    _pid.setGains(kp, ki, kd, trim, _prefs);
     char buf[100];
     snprintf(buf, sizeof(buf),
         "{\"done\":true,\"kp\":%.4f,\"ki\":%.4f,\"kd\":%.4f,\"sp\":%.4f}",
-        _pid.kp, _pid.ki, _pid.kd, _pid.setpoint);
+        _pid.kp, _pid.ki, _pid.kd, _pid.trim);
     _server.send(200, "application/json", buf);
 }
 
 void WebUI::handleBalanceState() {
-    float dispRoll = _mpu.cfRoll + _mpu.rollOffset;
+    float sp = _pid.setpointAccum + _pid.trim;
     char buf[220];
     snprintf(buf, sizeof(buf),
         "{\"running\":%s,\"error\":%.2f,\"output\":%.1f,\"spAccum\":%.2f,\"servoPos\":%d"
         ",\"kp\":%.4f,\"ki\":%.4f,\"kd\":%.4f,\"setpoint\":%.4f}",
         _pid.running ? "true" : "false",
-        _pid.setpoint - dispRoll, _pid.output, _pid.setpointAccum, _servo.targetPos,
-        _pid.kp, _pid.ki, _pid.kd, _pid.setpoint);
+        sp - _mpu.angle, _pid.output, _pid.setpointAccum, _servo.targetPos,
+        _pid.kp, _pid.ki, _pid.kd, _pid.trim);
     _server.send(200, "application/json", buf);
 }

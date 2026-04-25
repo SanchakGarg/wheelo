@@ -67,14 +67,14 @@ void loop() {
     ArduinoOTA.handle();
     ui.handle();
 
-    // Drain servo echo bytes
     while (Serial1.available()) Serial1.read();
 
-    // MPU at 500 Hz; PID immediately after
-    static uint32_t lastMpu = 0;
-    if (millis() - lastMpu >= 2) {
+    // Single 10ms tick: read DMP then run PID (matches XRobots V2 cadence)
+    static uint32_t lastLoop = 0;
+    uint32_t now = millis();
+    if (now - lastLoop >= 10) {
         mpu.read();
         pid.compute();
-        lastMpu = millis();
+        lastLoop = now;
     }
 }
