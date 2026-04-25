@@ -34,7 +34,7 @@ private:
     bool _cfInited = false;
 
     // Stage 2: moving median buffer
-    static constexpr int MEDIAN_N = 4; // window size — odd number (5, 7, 9)
+    static constexpr int MEDIAN_N = 7; // window size — odd number (5, 7, 9)
     float _medBuf[MEDIAN_N] = {};
     int _medHead = 0;
     int _medCount = 0; // samples collected so far (fills up to MEDIAN_N)
