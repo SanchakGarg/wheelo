@@ -41,7 +41,12 @@ COLUMNS = [
     "t_ms",         # ms since script start
     "wall_time",    # ISO timestamp (local clock)
     "running",      # PID active?
-    "roll_deg",     # derived: setpoint - error  (actual robot tilt)
+    "roll_deg",     # derived: setpoint - error when angle is not reported
+    "angle_deg",    # filtered complementary angle from MPU path
+    "rate_dps",     # filtered gyro rate used by PID derivative
+    "accel_angle_deg",
+    "accel_norm_g",
+    "dropped_reads",
     "error_deg",    # PID error term
     "output_deg",   # PID output (servo deflection in degrees)
     "sp_accum",     # SetpointAccum drift
@@ -120,12 +125,18 @@ def main():
             sp = float(j.get("setpoint", 0.0))
             err = float(j.get("error", 0.0))
             roll = sp - err
+            angle = float(j.get("angle", roll))
 
             writer.writerow({
                 "t_ms":        f"{elapsed_ms:.2f}",
                 "wall_time":   datetime.now().isoformat(timespec="milliseconds"),
                 "running":     j.get("running"),
                 "roll_deg":    f"{roll:.4f}",
+                "angle_deg":   f"{angle:.4f}",
+                "rate_dps":    f"{float(j.get('rate', 0.0)):.4f}",
+                "accel_angle_deg": f"{float(j.get('accelAngle', 0.0)):.4f}",
+                "accel_norm_g": f"{float(j.get('accelNorm', 0.0)):.4f}",
+                "dropped_reads": j.get("dropped", 0),
                 "error_deg":   f"{err:.4f}",
                 "output_deg":  f"{float(j.get('output', 0.0)):.4f}",
                 "sp_accum":    f"{float(j.get('spAccum', 0.0)):.4f}",
