@@ -8,6 +8,7 @@
 class BalancePID {
 public:
     bool  running       = false;
+    bool  accumEnabled  = false;
     float kp            = 1.8f;   // matches XRobots V2
     float ki            = 0.0f;   // start with integral off while tuning noise
     float kd            = 0.09f;  // matches XRobots V2
@@ -33,6 +34,7 @@ public:
     void stop();
     void compute();
     void setGains(float kp, float ki, float kd, float trim, Preferences& prefs);
+    void setAccumEnabled(bool enabled, Preferences& prefs);
 
 private:
     ServoController& _servo;

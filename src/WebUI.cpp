@@ -65,6 +65,9 @@ button.safe{background:#183328;border-color:var(--green);color:var(--green);}
 .graph-legend{display:flex;gap:12px;flex-wrap:wrap;}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);}
 .legend-dot{width:10px;height:3px;border-radius:2px;}
+.toggle-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.toggle-row label{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2);}
+.toggle-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--blue);}
 canvas{width:100%;height:90px;border-radius:6px;background:var(--bg);
   border:1px solid var(--border);display:block;}
 hr{border:none;border-top:1px solid var(--border);width:100%;}
@@ -204,6 +207,13 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
     </div>
     <div></div>
   </div>
+  <div class="toggle-row">
+    <label for="pid-accum-enabled">
+      <input id="pid-accum-enabled" type="checkbox"/>
+      Enable SetpointAccum recentering
+    </label>
+    <div class="limits">Off keeps the target angle fixed at <span>Trim</span> while tuning.</div>
+  </div>
 
   <!-- PID range reference -->
   <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:10px;">
@@ -253,7 +263,7 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
     <b style="color:var(--text2);">Algorithm (10ms fixed rate, filtered gyro derivative):</b><br/>
     &bull; ki_int = Ki &times; 0.01 &nbsp;|&nbsp; derivative uses filtered gyro rate directly<br/>
     &bull; integral clamps to &plusmn;35&deg;, output clamps to &plusmn;35&deg;, servo command slew-limited<br/>
-    &bull; SetpointAccum drifts &plusmn;0.5&deg; slowly to re-centre gimbal<br/><br/>
+    &bull; SetpointAccum can be enabled later if you want slow gimbal re-centering<br/><br/>
     <b style="color:var(--text2);">Tuning recipe:</b> Start Kp=1.8 Ki=0 Kd=0.09 &rarr; verify Rate is quiet with flywheel on &rarr; adjust Trim first &rarr; add Ki last.
   </div>
 </div>
@@ -529,6 +539,7 @@ const pidKpEl=document.getElementById('pid-kp');
 const pidKiEl=document.getElementById('pid-ki');
 const pidKdEl=document.getElementById('pid-kd');
 const pidSpEl=document.getElementById('pid-sp');
+const pidAccumEnabledEl=document.getElementById('pid-accum-enabled');
 let balRunning=false, balGainsLoaded=false;
 
 function updateBalUI(j){
@@ -542,6 +553,7 @@ function updateBalUI(j){
     pidKdEl.value=j.kd.toFixed(4); pidSpEl.value=j.setpoint.toFixed(1);
     balGainsLoaded=true;
   }
+  if(j.accumEnabled!==undefined) pidAccumEnabledEl.checked=!!j.accumEnabled;
   if(j.running){
     balToggle.textContent='STOP'; balToggle.className='danger';
     balStatus.textContent='Running — PID active'; balStatus.style.color='var(--green)';
@@ -575,6 +587,17 @@ document.getElementById('pid-apply').addEventListener('click',async()=>{
     pidKdEl.value=j.kd.toFixed(4); pidSpEl.value=j.sp.toFixed(1);
     toast('Saved: Kp='+j.kp.toFixed(4)+' Ki='+j.ki.toFixed(4)+' Kd='+j.kd.toFixed(4));
   }catch(e){toast('Failed — is ESP32 connected?');}
+});
+
+pidAccumEnabledEl.addEventListener('change',async()=>{
+  const enabled=pidAccumEnabledEl.checked?1:0;
+  try{
+    const r=await fetch('/balance/accum?enabled='+enabled);
+    if(!r.ok){toast('Server error '+r.status);return;}
+    const j=await r.json();
+    pidAccumEnabledEl.checked=!!j.accumEnabled;
+    toast(j.accumEnabled?'SetpointAccum enabled':'SetpointAccum disabled');
+  }catch(e){toast('Failed â€” is ESP32 connected?');}
 });
 
 document.querySelectorAll('.pid-step').forEach(btn=>{
@@ -625,6 +648,7 @@ void WebUI::begin() {
     _server.on("/balance/start",    [this](){ handleBalanceStart(); });
     _server.on("/balance/stop",     [this](){ handleBalanceStop(); });
     _server.on("/balance/pid",      [this](){ handleBalancePid(); });
+    _server.on("/balance/accum",    [this](){ handleBalanceAccum(); });
     _server.on("/balance/state",    [this](){ handleBalanceState(); });
     _server.begin();
 }
@@ -725,16 +749,28 @@ void WebUI::handleBalancePid() {
     _server.send(200, "application/json", buf);
 }
 
+void WebUI::handleBalanceAccum() {
+    if (!_server.hasArg("enabled")) {
+        _server.send(400, "text/plain", "missing enabled"); return;
+    }
+    _pid.setAccumEnabled(_server.arg("enabled").toInt() != 0, _prefs);
+    char buf[64];
+    snprintf(buf, sizeof(buf), "{\"accumEnabled\":%s}",
+             _pid.accumEnabled ? "true" : "false");
+    _server.send(200, "application/json", buf);
+}
+
 void WebUI::handleBalanceState() {
     float sp = _pid.setpointAccum + _pid.trim;
     char buf[360];
     snprintf(buf, sizeof(buf),
         "{\"running\":%s,\"error\":%.2f,\"output\":%.1f,\"spAccum\":%.2f,\"servoPos\":%d"
-        ",\"kp\":%.4f,\"ki\":%.4f,\"kd\":%.4f,\"setpoint\":%.4f"
+        ",\"kp\":%.4f,\"ki\":%.4f,\"kd\":%.4f,\"setpoint\":%.4f,\"accumEnabled\":%s"
         ",\"angle\":%.2f,\"rate\":%.2f,\"accelAngle\":%.2f,\"accelNorm\":%.3f,\"dropped\":%lu}",
         _pid.running ? "true" : "false",
         sp - _mpu.angle, _pid.output, _pid.setpointAccum, _servo.targetPos,
         _pid.kp, _pid.ki, _pid.kd, _pid.trim,
+        _pid.accumEnabled ? "true" : "false",
         _mpu.angle, _mpu.rateDps, _mpu.accelAngle, _mpu.accelNormG,
         (unsigned long)_mpu.droppedReads);
     _server.send(200, "application/json", buf);

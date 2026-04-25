@@ -34,5 +34,6 @@ private:
     void handleBalanceStart();
     void handleBalanceStop();
     void handleBalancePid();
+    void handleBalanceAccum();
     void handleBalanceState();
 };

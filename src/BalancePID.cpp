@@ -6,10 +6,11 @@ BalancePID::BalancePID(ServoController& servo, MPUSensor& mpu)
 
 void BalancePID::loadGains(Preferences& prefs) {
     prefs.begin(NVS_NS, true);
-    kp   = prefs.getFloat("pid_kp", 1.8f);
-    ki   = prefs.getFloat("pid_ki", 0.0f);
-    kd   = prefs.getFloat("pid_kd", 0.09f);
-    trim = prefs.getFloat("pid_tr", 0.0f);
+    kp           = prefs.getFloat("pid_kp", 1.8f);
+    ki           = prefs.getFloat("pid_ki", 0.0f);
+    kd           = prefs.getFloat("pid_kd", 0.09f);
+    trim         = prefs.getFloat("pid_tr", 0.0f);
+    accumEnabled = prefs.getBool("pid_acc_en", false);
     prefs.end();
 }
 
@@ -19,6 +20,7 @@ void BalancePID::saveGains(Preferences& prefs) {
     prefs.putFloat("pid_ki", ki);
     prefs.putFloat("pid_kd", kd);
     prefs.putFloat("pid_tr", trim);
+    prefs.putBool("pid_acc_en", accumEnabled);
     prefs.end();
 }
 
@@ -50,9 +52,13 @@ void BalancePID::compute() {
         return;
     }
 
-    // Drift setpoint toward centre to allow gimbal re-centering (XRobots V2)
-    setpointAccum += _prevOutput / SETPOINT_ACCUM_DIV;
-    setpointAccum  = constrain(setpointAccum, -SETPOINT_ACCUM_LIMIT, SETPOINT_ACCUM_LIMIT);
+    if (accumEnabled) {
+        // Drift setpoint toward centre to allow gimbal re-centering.
+        setpointAccum += _prevOutput / SETPOINT_ACCUM_DIV;
+        setpointAccum  = constrain(setpointAccum, -SETPOINT_ACCUM_LIMIT, SETPOINT_ACCUM_LIMIT);
+    } else {
+        setpointAccum = 0.0f;
+    }
 
     float setpoint = setpointAccum + trim;
     float error    = setpoint - angle;
@@ -88,5 +94,13 @@ void BalancePID::setGains(float newKp, float newKi, float newKd, float newTrim,
     _prevOutput   = 0.0f;
     setpointAccum = 0.0f;
     _servo.moveTo(_servo.defaultPos);
+    saveGains(prefs);
+}
+
+void BalancePID::setAccumEnabled(bool enabled, Preferences& prefs) {
+    accumEnabled  = enabled;
+    setpointAccum = 0.0f;
+    _outputSum    = 0.0f;
+    _prevOutput   = 0.0f;
     saveGains(prefs);
 }
