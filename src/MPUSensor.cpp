@@ -5,13 +5,45 @@
 MPUSensor::MPUSensor(uint8_t addr, int sda, int scl)
     : _addr(addr), _sda(sda), _scl(scl) {}
 
-void MPUSensor::rawRead(int16_t out[7]) {
+static float lowPass(float prev, float x, float cutoffHz, float dt) {
+    const float rc = 1.0f / (2.0f * 3.1415926535f * cutoffHz);
+    const float alpha = constrain(dt / (rc + dt), 0.0f, 1.0f);
+    return prev + alpha * (x - prev);
+}
+
+bool MPUSensor::writeReg(uint8_t reg, uint8_t value) {
     Wire.beginTransmission(_addr);
-    Wire.write(0x3B);
-    Wire.endTransmission(false);
-    Wire.requestFrom(_addr, (uint8_t)14, (uint8_t)true);
-    for (int i = 0; i < 7; i++)
-        out[i] = (int16_t)((Wire.read() << 8) | Wire.read());
+    Wire.write(reg);
+    Wire.write(value);
+    return Wire.endTransmission() == 0;
+}
+
+bool MPUSensor::readReg(uint8_t reg, uint8_t &value) {
+    Wire.beginTransmission(_addr);
+    Wire.write(reg);
+    if (Wire.endTransmission(false) != 0) return false;
+    if (Wire.requestFrom(_addr, (uint8_t)1, (uint8_t)true) != 1) return false;
+    int v = Wire.read();
+    if (v < 0) return false;
+    value = (uint8_t)v;
+    return true;
+}
+
+bool MPUSensor::rawRead(int16_t out[7]) {
+    Wire.beginTransmission(_addr);
+    Wire.write(REG_ACCEL_XOUT);
+    if (Wire.endTransmission(false) != 0) return false;
+
+    uint8_t n = Wire.requestFrom(_addr, (uint8_t)14, (uint8_t)true);
+    if (n != 14) return false;
+
+    for (int i = 0; i < 7; i++) {
+        int hi = Wire.read();
+        int lo = Wire.read();
+        if (hi < 0 || lo < 0) return false;
+        out[i] = (int16_t)((hi << 8) | lo);
+    }
+    return true;
 }
 
 void MPUSensor::begin(Preferences& prefs) {
@@ -30,14 +62,19 @@ void MPUSensor::begin(Preferences& prefs) {
     Wire.beginTransmission(_addr);
     if (Wire.endTransmission() != 0) { Serial.println("MPU6050: no ACK"); ok = false; return; }
 
-    Wire.beginTransmission(_addr); Wire.write(0x75); Wire.endTransmission(false);
-    Wire.requestFrom(_addr, (uint8_t)1);
-    Serial.printf("MPU6050 WHO_AM_I=0x%02X\n", Wire.read());
+    uint8_t who = 0;
+    if (readReg(REG_WHO_AM_I, who)) {
+        Serial.printf("MPU6050 WHO_AM_I=0x%02X\n", who);
+    } else {
+        Serial.println("MPU6050 WHO_AM_I read failed");
+    }
 
-    Wire.beginTransmission(_addr); Wire.write(0x6B); Wire.write(0x01); Wire.endTransmission();
+    if (!writeReg(REG_PWR_MGMT_1, 0x01)) { ok = false; return; }
     delay(10);
-    Wire.beginTransmission(_addr); Wire.write(0x1C); Wire.write(0x00); Wire.endTransmission();
-    Wire.beginTransmission(_addr); Wire.write(0x1B); Wire.write(0x00); Wire.endTransmission();
+    if (!writeReg(REG_CONFIG, MPU_DLPF_CFG)) { ok = false; return; }
+    if (!writeReg(REG_SMPLRT_DIV, MPU_SMPLRT_DIV)) { ok = false; return; }
+    if (!writeReg(REG_ACCEL_CFG, 0x00)) { ok = false; return; } // +/-2g
+    if (!writeReg(REG_GYRO_CFG, 0x00)) { ok = false; return; }  // +/-250 dps
     ok = true;
 
     prefs.begin(NVS_NS, true);
@@ -59,55 +96,67 @@ void MPUSensor::begin(Preferences& prefs) {
     }
 }
 
-// insertion sort on a small copy — fast enough for MEDIAN_N <= 11
-static float medianOf(float* buf, int n) {
-    float s[11];
-    for (int i = 0; i < n; i++) s[i] = buf[i];
-    for (int i = 1; i < n; i++) {
-        float key = s[i]; int j = i - 1;
-        while (j >= 0 && s[j] > key) { s[j+1] = s[j]; j--; }
-        s[j+1] = key;
-    }
-    return s[n / 2];
+void MPUSensor::resetFilters() {
+    _eAx = _eAy = _eAz = _eGx = 0.0f;
+    _cfAngle = 0.0f;
+    _lastUs = 0;
+    _cfInited = false;
+    rateDps = 0.0f;
+    accelAngle = 0.0f;
+    accelNormG = 1.0f;
 }
 
-void MPUSensor::read() {
-    if (!ok || calibrating) return;
+bool MPUSensor::read() {
+    if (!ok || calibrating) return false;
 
     int16_t raw[7];
-    rawRead(raw);
+    if (!rawRead(raw)) {
+        droppedReads++;
+        return false;
+    }
 
     float rax = raw[0] / 16384.0f - _biasAx;
     float ray = raw[1] / 16384.0f - _biasAy;
     float raz = raw[2] / 16384.0f - _biasAz;
     float rgx = raw[4] / 131.0f   - _biasGx;
 
-    // Stage 1: EMA on raw sensor readings — reduces vibration amplitude
-    if (!_emaInited) {
-        _eAx=rax; _eAy=ray; _eAz=raz; _eGx=rgx;
-        _emaInited = true;
+    uint32_t now = micros();
+    float dt = _cfInited ? constrain((now - _lastUs) / 1e6f, 0.005f, 0.025f) : 0.01f;
+    _lastUs = now;
+
+    accelNormG = sqrtf(rax * rax + ray * ray + raz * raz);
+
+    if (!_cfInited) {
+        _eAx = rax;
+        _eAy = ray;
+        _eAz = raz;
+        _eGx = rgx;
+        accelAngle = atan2f(_eAy, _eAz) * 57.2957795f;
+        _cfAngle = accelAngle;
+        _cfInited = true;
     } else {
-        _eAx = RAW_ALPHA*rax + (1-RAW_ALPHA)*_eAx;
-        _eAy = RAW_ALPHA*ray + (1-RAW_ALPHA)*_eAy;
-        _eAz = RAW_ALPHA*raz + (1-RAW_ALPHA)*_eAz;
-        _eGx = RAW_ALPHA*rgx + (1-RAW_ALPHA)*_eGx;
+        _eAx = lowPass(_eAx, rax, 12.0f, dt);
+        _eAy = lowPass(_eAy, ray, 12.0f, dt);
+        _eAz = lowPass(_eAz, raz, 12.0f, dt);
+        _eGx = lowPass(_eGx, rgx, 20.0f, dt);
+        accelAngle = atan2f(_eAy, _eAz) * 57.2957795f;
     }
 
-    uint32_t now = micros();
-    float dt = _cfInited ? constrain((now-_lastUs)/1e6f, 0.001f, 0.1f) : 0.01f;
-    _lastUs   = now;
-    _cfInited = true;
+    rateDps = _eGx;
 
-    // Complementary filter
-    float accelAngle = atan2f(_eAy, _eAz) * 57.2958f;
-    _cfAngle = 0.98f * (_cfAngle + _eGx * dt) + 0.02f * accelAngle;
+    float accelCutoffHz = 0.35f;
+    if (fabsf(accelNormG - 1.0f) > 0.18f) {
+        accelCutoffHz = 0.05f;
+    }
+    const float accelTrust = constrain(
+        dt / ((1.0f / (2.0f * 3.1415926535f * accelCutoffHz)) + dt),
+        0.0f, 1.0f);
 
-    // Stage 2: moving median — statistically rejects vibration spikes
-    _medBuf[_medHead] = _cfAngle;
-    _medHead = (_medHead + 1) % MEDIAN_N;
-    if (_medCount < MEDIAN_N) _medCount++;
+    _cfAngle = (1.0f - accelTrust) * (_cfAngle + rateDps * dt)
+             + accelTrust * accelAngle;
 
-    angle = medianOf(_medBuf, _medCount) + angleOffset;
+    angle = _cfAngle + angleOffset;
+    return true;
 }
 
 void MPUSensor::calibrate(Preferences& prefs, int samples) {
@@ -115,17 +164,36 @@ void MPUSensor::calibrate(Preferences& prefs, int samples) {
     calibrating = true;
     Serial.printf("Bias cal (%d samples)…\n", samples);
     double ax=0,ay=0,az=0,gx=0,gy=0,gz=0;
-    for (int i = 0; i < samples; i++) {
-        int16_t raw[7]; rawRead(raw);
+    int collected = 0;
+    int attempts = 0;
+    const int maxAttempts = samples * 4;
+    while (collected < samples && attempts < maxAttempts) {
+        attempts++;
+        int16_t raw[7];
+        if (!rawRead(raw)) {
+            droppedReads++;
+            delay(2);
+            continue;
+        }
         ax+=raw[0]/16384.0; ay+=raw[1]/16384.0; az+=raw[2]/16384.0;
         gx+=raw[4]/131.0;   gy+=raw[5]/131.0;   gz+=raw[6]/131.0;
+        collected++;
         delay(2);
     }
-    _biasAx=ax/samples;   _biasAy=ay/samples;
-    _biasAz=az/samples-1.0f;
-    _biasGx=gx/samples;   _biasGy=gy/samples;   _biasGz=gz/samples;
-    _cfAngle=0; _cfInited=false; _emaInited=false;
-    _medHead=0; _medCount=0;
+
+    if (collected == 0) {
+        Serial.println("Bias cal failed: no valid MPU samples");
+        calibrating = false;
+        return;
+    }
+    if (collected < samples) {
+        Serial.printf("Bias cal used %d/%d valid samples\n", collected, samples);
+    }
+
+    _biasAx=ax/collected;   _biasAy=ay/collected;
+    _biasAz=az/collected-1.0f;
+    _biasGx=gx/collected;   _biasGy=gy/collected;   _biasGz=gz/collected;
+    resetFilters();
     Serial.printf("Bias: ax=%.3f ay=%.3f az=%.3f gx=%.3f\n",
                   _biasAx, _biasAy, _biasAz, _biasGx);
     saveBias(prefs);

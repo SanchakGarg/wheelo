@@ -177,7 +177,7 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
       <div style="font-size:9px;color:var(--muted);">Ki &mdash; integral &nbsp;&#9660;&#9650;&nbsp;1</div>
       <div style="display:flex;gap:3px;">
         <button class="pid-step" data-id="pid-ki" data-step="-1" style="padding:7px 9px;">&#9660;</button>
-        <input id="pid-ki" type="number" step="any" min="0" max="100" value="22.0" inputmode="decimal" style="text-align:center;"/>
+        <input id="pid-ki" type="number" step="any" min="0" max="100" value="0.0" inputmode="decimal" style="text-align:center;"/>
         <button class="pid-step" data-id="pid-ki" data-step="1" style="padding:7px 9px;">&#9650;</button>
       </div>
     </div>
@@ -229,14 +229,14 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
         <tr style="border-bottom:1px solid var(--border);">
           <td style="padding:6px 10px;color:var(--text);font-weight:700;">Ki</td>
           <td style="padding:6px 10px;text-align:center;">0 &ndash; 50</td>
-          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">22.0</td>
-          <td style="padding:6px 10px;">Scaled for 10ms sample: ki_int = Ki &times; 0.01</td>
+          <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">0.0</td>
+          <td style="padding:6px 10px;">Start at 0 on the stand; add only after rate noise is controlled</td>
         </tr>
         <tr style="border-bottom:1px solid var(--border);">
           <td style="padding:6px 10px;color:var(--text);font-weight:700;">Kd</td>
           <td style="padding:6px 10px;text-align:center;">0.01 &ndash; 0.5</td>
           <td style="padding:6px 10px;text-align:center;color:#52c87a;font-weight:700;">0.09</td>
-          <td style="padding:6px 10px;">Scaled for 10ms sample: kd_int = Kd / 0.01</td>
+          <td style="padding:6px 10px;">Multiplies filtered gyro rate directly, in deg/sec</td>
         </tr>
         <tr>
           <td style="padding:6px 10px;color:var(--text);font-weight:700;">Trim</td>
@@ -250,34 +250,53 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
 
   <div style="font-size:10px;color:var(--muted);line-height:1.85;border-top:1px solid var(--border);padding-top:10px;">
     <b style="color:#ff9900;">&#9650; Before starting:</b> hold robot in balance pose &rarr; press <b style="color:var(--text2);">Zero Angle</b> in MPU panel so Angle reads 0&deg; &rarr; adjust Trim until stable &rarr; hit START.<br/><br/>
-    <b style="color:var(--text2);">Algorithm (XRobots V2, PID_v1-equivalent, 10ms fixed rate):</b><br/>
-    &bull; ki_int = Ki &times; 0.01 &nbsp;|&nbsp; kd_int = Kd / 0.01 (pre-scaled by sample time)<br/>
-    &bull; integral clamps to &plusmn;35&deg;, output clamps to &plusmn;35&deg;<br/>
+    <b style="color:var(--text2);">Algorithm (10ms fixed rate, filtered gyro derivative):</b><br/>
+    &bull; ki_int = Ki &times; 0.01 &nbsp;|&nbsp; derivative uses filtered gyro rate directly<br/>
+    &bull; integral clamps to &plusmn;35&deg;, output clamps to &plusmn;35&deg;, servo command slew-limited<br/>
     &bull; SetpointAccum drifts &plusmn;0.5&deg; slowly to re-centre gimbal<br/><br/>
-    <b style="color:var(--text2);">Tuning recipe:</b> Start Kp=1.8 Ki=22 Kd=0.09 &rarr; adjust Trim first &rarr; raise Kp if sluggish &rarr; raise Kd if oscillating.
+    <b style="color:var(--text2);">Tuning recipe:</b> Start Kp=1.8 Ki=0 Kd=0.09 &rarr; verify Rate is quiet with flywheel on &rarr; adjust Trim first &rarr; add Ki last.
   </div>
 </div>
 
 <!-- MPU6050 -->
 <div class="panel full">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-    <div class="panel-title">&#11835; MPU6050 DMP &nbsp;<span id="mpu-status" style="color:var(--muted)">connecting…</span></div>
+    <div class="panel-title">&#11835; MPU6050 Filtered &nbsp;<span id="mpu-status" style="color:var(--muted)">connecting…</span></div>
     <div style="display:flex;gap:8px;">
       <button id="mpu-cal-btn" class="prim" style="font-size:10px;padding:7px 12px;">Bias Cal</button>
     </div>
   </div>
   <div id="mpu-cal-msg" style="font-size:11px;color:var(--muted);display:none;"></div>
 
-  <div class="mpu-grid" style="grid-template-columns:repeat(2,1fr);">
+  <div class="mpu-grid" style="grid-template-columns:repeat(3,1fr);">
     <div class="mpu-cell" style="border-color:#ff9900aa;">
       <div class="mpu-lbl" style="color:#ff9900;">Angle (Pitch)</div>
       <div class="mpu-num" id="m-angle" style="color:#ff9900;font-size:28px;">—</div>
       <div class="mpu-unit">deg</div></div>
+    <div class="mpu-cell">
+      <div class="mpu-lbl">Rate</div>
+      <div class="mpu-num" id="m-rate" style="color:#4d9eff;">—</div>
+      <div class="mpu-unit">deg/sec</div></div>
     <div class="mpu-cell" style="padding:6px;">
       <button id="reset-angles-btn" style="width:100%;height:100%;font-size:9px;
         letter-spacing:.08em;background:#1a2030;border-color:#3a4a5a;color:#5a7a9a;
         border-radius:5px;cursor:pointer;padding:4px;">Zero<br/>Angle</button>
     </div>
+  </div>
+
+  <div class="mpu-grid">
+    <div class="mpu-cell">
+      <div class="mpu-lbl">Accel Angle</div>
+      <div class="mpu-num" id="m-accel-angle">—</div>
+      <div class="mpu-unit">deg</div></div>
+    <div class="mpu-cell">
+      <div class="mpu-lbl">Accel Norm</div>
+      <div class="mpu-num" id="m-accel-norm">—</div>
+      <div class="mpu-unit">g</div></div>
+    <div class="mpu-cell">
+      <div class="mpu-lbl">Dropped I2C</div>
+      <div class="mpu-num" id="m-dropped">—</div>
+      <div class="mpu-unit">reads</div></div>
   </div>
 
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -296,9 +315,10 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
   </div>
 
   <div class="graph-wrap">
-    <div class="graph-title">Angle — DMP Pitch &nbsp;<span style="color:var(--muted)">(auto-scale °)</span></div>
+    <div class="graph-title">Angle + Rate &nbsp;<span style="color:var(--muted)">(auto-scale)</span></div>
     <div class="graph-legend">
       <div class="legend-item"><div class="legend-dot" style="background:#ff9900"></div>Angle</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4d9eff"></div>Rate</div>
     </div>
     <canvas id="gyro-graph"></canvas>
   </div>
@@ -446,7 +466,7 @@ function makeGraph(canvasId,channels,minRange){
   }
   return{push,draw};
 }
-const gyroGraph=makeGraph('gyro-graph',[{color:'#ff9900'}],5);
+const gyroGraph=makeGraph('gyro-graph',[{color:'#ff9900'},{color:'#4d9eff'}],5);
 
 const mpuStatus=document.getElementById('mpu-status');
 const mpuCalMsg=document.getElementById('mpu-cal-msg');
@@ -461,8 +481,12 @@ async function fetchMpu(){
     else{
       mpuStatus.textContent='live'; mpuStatus.style.color='var(--green)';
       document.getElementById('m-angle').textContent=j.angle.toFixed(2);
+      document.getElementById('m-rate').textContent=j.rate.toFixed(2);
+      document.getElementById('m-accel-angle').textContent=j.accelAngle.toFixed(2);
+      document.getElementById('m-accel-norm').textContent=j.accelNorm.toFixed(3);
+      document.getElementById('m-dropped').textContent=j.dropped;
       vertBanner.style.display=j.vertical?'block':'none';
-      gyroGraph.push([j.angle]);
+      gyroGraph.push([j.angle,j.rate]);
     }
   }catch(e){}
   setTimeout(fetchMpu,80);
@@ -643,18 +667,21 @@ void WebUI::handleServoSetDefault() {
 
 void WebUI::handleMpu() {
     bool vert = fabsf(_mpu.angle) > 70.0f;
-    char buf[100];
+    char buf[240];
     snprintf(buf, sizeof(buf),
-        "{\"ok\":%s,\"cal\":%s,\"angle\":%.2f,\"vertical\":%s}",
+        "{\"ok\":%s,\"cal\":%s,\"angle\":%.2f,\"rate\":%.2f,"
+        "\"accelAngle\":%.2f,\"accelNorm\":%.3f,\"dropped\":%lu,\"vertical\":%s}",
         _mpu.ok ? "true" : "false",
         _mpu.calibrating ? "true" : "false",
-        _mpu.angle, vert ? "true" : "false");
+        _mpu.angle, _mpu.rateDps, _mpu.accelAngle, _mpu.accelNormG,
+        (unsigned long)_mpu.droppedReads, vert ? "true" : "false");
     _server.send(200, "application/json", buf);
 }
 
 void WebUI::handleMpuCalibrate() {
     if (!_mpu.ok)          { _server.send(503, "text/plain", "MPU not found"); return; }
     if (_mpu.calibrating)  { _server.send(409, "text/plain", "already calibrating"); return; }
+    _pid.stop();
     _mpu.calibrate(_prefs);
     _server.send(200, "application/json", "{\"done\":true}");
 }
@@ -700,12 +727,15 @@ void WebUI::handleBalancePid() {
 
 void WebUI::handleBalanceState() {
     float sp = _pid.setpointAccum + _pid.trim;
-    char buf[220];
+    char buf[360];
     snprintf(buf, sizeof(buf),
         "{\"running\":%s,\"error\":%.2f,\"output\":%.1f,\"spAccum\":%.2f,\"servoPos\":%d"
-        ",\"kp\":%.4f,\"ki\":%.4f,\"kd\":%.4f,\"setpoint\":%.4f}",
+        ",\"kp\":%.4f,\"ki\":%.4f,\"kd\":%.4f,\"setpoint\":%.4f"
+        ",\"angle\":%.2f,\"rate\":%.2f,\"accelAngle\":%.2f,\"accelNorm\":%.3f,\"dropped\":%lu}",
         _pid.running ? "true" : "false",
         sp - _mpu.angle, _pid.output, _pid.setpointAccum, _servo.targetPos,
-        _pid.kp, _pid.ki, _pid.kd, _pid.trim);
+        _pid.kp, _pid.ki, _pid.kd, _pid.trim,
+        _mpu.angle, _mpu.rateDps, _mpu.accelAngle, _mpu.accelNormG,
+        (unsigned long)_mpu.droppedReads);
     _server.send(200, "application/json", buf);
 }

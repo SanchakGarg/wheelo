@@ -7,7 +7,7 @@ BalancePID::BalancePID(ServoController& servo, MPUSensor& mpu)
 void BalancePID::loadGains(Preferences& prefs) {
     prefs.begin(NVS_NS, true);
     kp   = prefs.getFloat("pid_kp", 1.8f);
-    ki   = prefs.getFloat("pid_ki", 22.0f);
+    ki   = prefs.getFloat("pid_ki", 0.0f);
     kd   = prefs.getFloat("pid_kd", 0.09f);
     trim = prefs.getFloat("pid_tr", 0.0f);
     prefs.end();
@@ -26,7 +26,6 @@ void BalancePID::start() {
     _outputSum    = 0.0f;
     _prevOutput   = 0.0f;
     setpointAccum = 0.0f;
-    _lastAngle    = _mpu.angle;
     output        = 0.0f;
     running       = true;
 }
@@ -57,19 +56,26 @@ void BalancePID::compute() {
 
     float setpoint = setpointAccum + trim;
     float error    = setpoint - angle;
+    float rate     = _mpu.rateDps;
 
-    // PID_v1-equivalent math with fixed 10ms sample time (matches V2 SetSampleTime(10))
-    const float ki_int = ki * SAMPLE_TIME_S;  // integral gain × dt
-    const float kd_int = kd / SAMPLE_TIME_S;  // derivative gain / dt
+    // PID_v1-equivalent integral with derivative damping from filtered gyro rate.
+    const float ki_int = ki * SAMPLE_TIME_S;
+    const float iError = fabsf(error) > ANGLE_DEADBAND_DEG ? error : 0.0f;
+    const float dRate  = fabsf(rate)  > RATE_DEADBAND_DPS  ? rate  : 0.0f;
 
-    _outputSum += ki_int * error;
+    _outputSum += ki_int * iError;
     _outputSum  = constrain(_outputSum, -OUTPUT_LIMIT, OUTPUT_LIMIT);
 
-    float dInput = angle - _lastAngle;  // derivative on measurement, no filter needed (DMP is clean)
-    _lastAngle   = angle;
+    float desired = kp * error + _outputSum - kd * dRate;
+    if (fabsf(error) < ANGLE_DEADBAND_DEG && fabsf(rate) < RATE_DEADBAND_DPS) {
+        desired = 0.0f;
+        _outputSum *= 0.98f;
+    }
 
-    output = kp * error + _outputSum - kd_int * dInput;
-    output = constrain(output, -OUTPUT_LIMIT, OUTPUT_LIMIT);
+    desired = constrain(desired, -OUTPUT_LIMIT, OUTPUT_LIMIT);
+    output = _prevOutput + constrain(desired - _prevOutput,
+                                     -MAX_OUTPUT_STEP,
+                                      MAX_OUTPUT_STEP);
     _prevOutput = output;
 
     _servo.moveTo(_servo.defaultPos + SERVO_DIR * (int)(output / 0.088f));

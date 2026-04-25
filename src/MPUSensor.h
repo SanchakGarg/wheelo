@@ -8,13 +8,17 @@ class MPUSensor
 public:
     float angle = 0.0f;
     float angleOffset = 0.0f;
+    float rateDps = 0.0f;
+    float accelAngle = 0.0f;
+    float accelNormG = 1.0f;
+    uint32_t droppedReads = 0;
     bool ok = false;
     bool calibrating = false;
 
     MPUSensor(uint8_t addr, int sda, int scl);
 
     void begin(Preferences &prefs);
-    void read();
+    bool read();
     void calibrate(Preferences &prefs, int samples = 1000);
     void resetAngle(Preferences &prefs);
     void setAngle(float target, Preferences &prefs);
@@ -27,21 +31,28 @@ private:
     float _biasGx = 0, _biasGy = 0, _biasGz = 0;
 
     // Smoothing state
-    float _eAx = 0, _eAy = 0, _eAz = 0, _eGx = 0; // stage 1: raw EMA
-    float _cfAngle = 0.0f;                        // complementary filter output
-    bool _emaInited = false;
+    float _eAx = 0, _eAy = 0, _eAz = 0, _eGx = 0;
+    float _cfAngle = 0.0f;
     uint32_t _lastUs = 0;
     bool _cfInited = false;
 
-    // Stage 2: moving median buffer
-    static constexpr int MEDIAN_N = 7; // window size — odd number (5, 7, 9)
-    float _medBuf[MEDIAN_N] = {};
-    int _medHead = 0;
-    int _medCount = 0; // samples collected so far (fills up to MEDIAN_N)
+    static constexpr uint8_t REG_SMPLRT_DIV = 0x19;
+    static constexpr uint8_t REG_CONFIG     = 0x1A;
+    static constexpr uint8_t REG_GYRO_CFG   = 0x1B;
+    static constexpr uint8_t REG_ACCEL_CFG  = 0x1C;
+    static constexpr uint8_t REG_ACCEL_XOUT = 0x3B;
+    static constexpr uint8_t REG_PWR_MGMT_1 = 0x6B;
+    static constexpr uint8_t REG_WHO_AM_I   = 0x75;
 
-    static constexpr float RAW_ALPHA = 0.12f; // raw EMA alpha (lower = smoother)
+    // DLPF 4 is ~20 Hz gyro bandwidth. If the flywheel still aliases into
+    // the estimate on hardware, DLPF 5 (~10 Hz) is the next conservative step.
+    static constexpr uint8_t MPU_DLPF_CFG   = 4;
+    static constexpr uint8_t MPU_SMPLRT_DIV = 9; // 1 kHz / (1 + 9) = 100 Hz
 
-    void rawRead(int16_t out[7]);
+    bool writeReg(uint8_t reg, uint8_t value);
+    bool readReg(uint8_t reg, uint8_t &value);
+    bool rawRead(int16_t out[7]);
+    void resetFilters();
     void saveBias(Preferences &prefs);
     void saveOffset(Preferences &prefs);
 };

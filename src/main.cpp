@@ -69,12 +69,13 @@ void loop() {
 
     while (Serial1.available()) Serial1.read();
 
-    // Single 10ms tick: read DMP then run PID (matches XRobots V2 cadence)
+    // Single 10ms tick: read filtered MPU6050 data, then run PID on fresh samples.
     static uint32_t lastLoop = 0;
     uint32_t now = millis();
     if (now - lastLoop >= 10) {
-        mpu.read();
-        pid.compute();
+        if (mpu.read()) {
+            pid.compute();
+        }
         lastLoop = now;
     }
 }
