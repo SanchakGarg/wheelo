@@ -16,7 +16,7 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(
   --text:#d0dae8;--text2:#8a9ab0;}
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{min-height:100%;background:var(--bg);color:var(--text);
-  font-family:'Courier New',Courier,monospace;touch-action:none;}
+  font-family:'Courier New',Courier,monospace;}
 body{display:flex;flex-direction:column;align-items:center;
   padding:24px 14px 56px;gap:20px;}
 .hdr{display:flex;align-items:center;gap:10px;width:min(98vw,880px);}
@@ -31,7 +31,7 @@ h1{font-size:13px;letter-spacing:.18em;text-transform:uppercase;
   display:flex;flex-direction:column;gap:14px;}
 .panel-title{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);}
 .dial-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;}
-.dial-svg{width:min(38vw,180px);aspect-ratio:1/1;cursor:pointer;}
+.dial-svg{width:min(38vw,180px);aspect-ratio:1/1;cursor:pointer;touch-action:none;}
 .dial-val{font-size:44px;font-weight:700;letter-spacing:-.03em;
   font-variant-numeric:tabular-nums;line-height:1;}
 .dial-sub{font-size:11px;color:var(--text2);letter-spacing:.06em;}
