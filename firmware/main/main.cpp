@@ -67,15 +67,21 @@ void loop() {
     ArduinoOTA.handle();
     ui.handle();
 
-    while (Serial1.available()) Serial1.read();
-
-    // Single 10ms tick: read filtered MPU6050 data, then run PID on fresh samples.
     static uint32_t lastLoop = 0;
+    static uint32_t lastReadPos = 0;
     uint32_t now = millis();
+
+    // 10ms PID tick
     if (now - lastLoop >= 10) {
-        if (mpu.read()) {
-            pid.compute();
-        }
+        if (mpu.read()) { pid.compute(); }
         lastLoop = now;
+    }
+
+    // 50ms servo position read. Runs during balancing too — compute() uses
+    // currentPos as its velocity base, so it must stay fresh. readPos has a
+    // 3ms timeout, so at worst one in five 10ms PID ticks is 3ms late.
+    if (now - lastReadPos >= 50) {
+        servo.readPos();
+        lastReadPos = now;
     }
 }

@@ -6,6 +6,7 @@ class ServoController {
 public:
     int defaultPos;
     int targetPos;
+    int currentPos = 0;
 
     ServoController(uint8_t id, uint32_t baud, int rxPin, int txPin,
                     int defaultFallback, int swing);
@@ -13,6 +14,7 @@ public:
     void begin(Preferences& prefs);
     void moveTo(int pos);
     void setDefault(int pos, Preferences& prefs);
+    int  readPos();
     int  getLo() const;
     int  getHi() const;
 

@@ -29,6 +29,7 @@ private:
     void handleServoSetDefault();
     void handleMpu();
     void handleMpuCalibrate();
+    void handleMpuNoiseCal();
     void handleMpuResetAngles();
     void handleMpuSetAngle();
     void handleBalanceStart();

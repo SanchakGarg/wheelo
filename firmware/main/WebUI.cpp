@@ -122,6 +122,7 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
       </svg>
       <div id="srv-val" class="dial-val">1100</div>
       <div id="srv-limits" class="dial-sub limits">750 – 1450</div>
+      <div class="dial-sub">Live: <span id="srv-live" style="color:var(--green);font-weight:700;">—</span></div>
     </div>
     <div class="row">
       <input id="srv-num" type="number" min="0" max="4095" step="1" value="1100" inputmode="numeric"/>
@@ -160,8 +161,8 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
       <div class="mpu-num" id="bal-accum" style="color:#8855cc;">—</div>
       <div class="mpu-unit">deg</div></div>
     <div class="mpu-cell">
-      <div class="mpu-lbl">Servo Pos</div>
-      <div class="mpu-num" id="bal-srv">—</div>
+      <div class="mpu-lbl">Live Pos</div>
+      <div class="mpu-num" id="bal-srv" style="color:var(--green);">—</div>
       <div class="mpu-unit">/ 4095</div></div>
   </div>
 
@@ -272,8 +273,9 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
 <div class="panel full">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
     <div class="panel-title">&#11835; MPU6050 Filtered &nbsp;<span id="mpu-status" style="color:var(--muted)">connecting…</span></div>
-    <div style="display:flex;gap:8px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button id="mpu-cal-btn" class="prim" style="font-size:10px;padding:7px 12px;">Bias Cal</button>
+      <button id="mpu-noise-btn" class="prim" style="font-size:10px;padding:7px 12px;">Gyro Noise Cal</button>
     </div>
   </div>
   <div id="mpu-cal-msg" style="font-size:11px;color:var(--muted);display:none;"></div>
@@ -307,6 +309,10 @@ hr{border:none;border-top:1px solid var(--border);width:100%;}
       <div class="mpu-lbl">Dropped I2C</div>
       <div class="mpu-num" id="m-dropped">—</div>
       <div class="mpu-unit">reads</div></div>
+    <div class="mpu-cell">
+      <div class="mpu-lbl">Noise Floors (3σ)</div>
+      <div class="mpu-num" id="m-noise" style="font-size:13px;line-height:1.5;">—</div>
+      <div class="mpu-unit" id="m-noise-unit">rate / accel innov</div></div>
   </div>
 
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -481,6 +487,7 @@ const gyroGraph=makeGraph('gyro-graph',[{color:'#ff9900'},{color:'#4d9eff'}],5);
 const mpuStatus=document.getElementById('mpu-status');
 const mpuCalMsg=document.getElementById('mpu-cal-msg');
 const mpuCalBtn=document.getElementById('mpu-cal-btn');
+const mpuNoiseBtn=document.getElementById('mpu-noise-btn');
 const vertBanner=document.getElementById('vertical-banner');
 
 async function fetchMpu(){
@@ -495,6 +502,10 @@ async function fetchMpu(){
       document.getElementById('m-accel-angle').textContent=j.accelAngle.toFixed(2);
       document.getElementById('m-accel-norm').textContent=j.accelNorm.toFixed(3);
       document.getElementById('m-dropped').textContent=j.dropped;
+      if(j.noiseFloor!==undefined){
+        const nf=j.noiseFloor.toFixed(4), id=j.innovDb!==undefined?j.innovDb.toFixed(3):'—';
+        document.getElementById('m-noise').innerHTML=nf+'°/s<br>'+id+'°';
+      }
       vertBanner.style.display=j.vertical?'block':'none';
       gyroGraph.push([j.angle,j.rate]);
     }
@@ -506,17 +517,35 @@ function renderLoop(){gyroGraph.draw();requestAnimationFrame(renderLoop);}
 requestAnimationFrame(renderLoop);
 
 async function runCal(url,msg,successMsg){
-  mpuCalBtn.disabled=true;
+  mpuCalBtn.disabled=true; mpuNoiseBtn.disabled=true;
   mpuCalMsg.textContent=msg; mpuCalMsg.style.display='block';
   mpuStatus.textContent='calibrating…'; mpuStatus.style.color='var(--blue)';
   try{const r=await fetch(url),j=await r.json();if(j.done)toast(successMsg);}
   catch(e){toast('Failed — check connection');}
   mpuCalMsg.style.display='none';
   mpuStatus.textContent='live'; mpuStatus.style.color='var(--green)';
-  mpuCalBtn.disabled=false;
+  mpuCalBtn.disabled=false; mpuNoiseBtn.disabled=false;
 }
 mpuCalBtn.addEventListener('click',()=>
   runCal('/mpu/calibrate','Bias cal — keep flat & still (~2 s)…','Bias saved ✓'));
+
+mpuNoiseBtn.addEventListener('click',async()=>{
+  mpuCalBtn.disabled=true; mpuNoiseBtn.disabled=true;
+  mpuCalMsg.textContent='Gyro noise cal — keep still with flywheel spinning (~30 s)…';
+  mpuCalMsg.style.display='block';
+  mpuStatus.textContent='calibrating…'; mpuStatus.style.color='var(--blue)';
+  try{
+    const r=await fetch('/mpu/noisecal'), j=await r.json();
+    if(j.done){
+      const nf=(j.noiseFloor||0).toFixed(4), id=(j.noiseFloor||0);
+      document.getElementById('m-noise').innerHTML=nf+'°/s<br>'+(j.innovDb||0).toFixed(3)+'°';
+      toast('Rate floor: '+nf+' °/s · Accel DB: '+(j.innovDb||0).toFixed(3)+'° ✓');
+    }
+  }catch(e){toast('Failed — check connection');}
+  mpuCalMsg.style.display='none';
+  mpuStatus.textContent='live'; mpuStatus.style.color='var(--green)';
+  mpuCalBtn.disabled=false; mpuNoiseBtn.disabled=false;
+});
 document.getElementById('reset-angles-btn').addEventListener('click',async()=>{
   try{await fetch('/mpu/resetangles');toast('Angle zeroed');}catch(e){}
 });
@@ -547,7 +576,11 @@ function updateBalUI(j){
   if(j.error!==undefined)     balErrEl.textContent=j.error.toFixed(2);
   if(j.output!==undefined)    balOutEl.textContent=j.output.toFixed(1);
   if(j.spAccum!==undefined)balAccumEl.textContent=j.spAccum.toFixed(2);
-  if(j.servoPos!==undefined)  balSrvEl.textContent=j.servoPos;
+  if(j.servoPos!==undefined){
+    balSrvEl.textContent=j.servoPos;
+    const srvLive=document.getElementById('srv-live');
+    if(srvLive)srvLive.textContent=j.servoPos;
+  }
   if(!balGainsLoaded&&j.kp!==undefined){
     pidKpEl.value=j.kp.toFixed(4); pidKiEl.value=j.ki.toFixed(4);
     pidKdEl.value=j.kd.toFixed(4); pidSpEl.value=j.setpoint.toFixed(1);
@@ -619,6 +652,7 @@ fetch('/state').then(r=>r.json()).then(j=>{
     srvDefNumEl.value=j.servoDefault; updateSrvLimits(j.servoDefault);
   }
   if(j.servoPos!==undefined){srvDial.setVal(j.servoPos,false);srvNumEl.value=j.servoPos;}
+  if(j.servoLive!==undefined){const el=document.getElementById('srv-live');if(el)el.textContent=j.servoLive;}
 }).catch(()=>{});
 
 window.addEventListener('resize',()=>gyroGraph.draw());
@@ -643,6 +677,7 @@ void WebUI::begin() {
     _server.on("/servo/setdefault", [this](){ handleServoSetDefault(); });
     _server.on("/mpu",              [this](){ handleMpu(); });
     _server.on("/mpu/calibrate",    [this](){ handleMpuCalibrate(); });
+    _server.on("/mpu/noisecal",     [this](){ handleMpuNoiseCal(); });
     _server.on("/mpu/resetangles",  [this](){ handleMpuResetAngles(); });
     _server.on("/mpu/setangle",     [this](){ handleMpuSetAngle(); });
     _server.on("/balance/start",    [this](){ handleBalanceStart(); });
@@ -670,6 +705,7 @@ void WebUI::handleSet() {
 void WebUI::handleState() {
     String j = "{\"pct\":"          + String(_esc.throttlePct)
              + ",\"servoPos\":"     + String(_servo.targetPos)
+             + ",\"servoLive\":"    + String(_servo.currentPos)
              + ",\"servoDefault\":" + String(_servo.defaultPos)
              + ",\"servoLo\":"      + String(_servo.getLo())
              + ",\"servoHi\":"      + String(_servo.getHi())
@@ -691,14 +727,16 @@ void WebUI::handleServoSetDefault() {
 
 void WebUI::handleMpu() {
     bool vert = fabsf(_mpu.angle) > 70.0f;
-    char buf[240];
+    char buf[280];
     snprintf(buf, sizeof(buf),
         "{\"ok\":%s,\"cal\":%s,\"angle\":%.2f,\"rate\":%.2f,"
-        "\"accelAngle\":%.2f,\"accelNorm\":%.3f,\"dropped\":%lu,\"vertical\":%s}",
+        "\"accelAngle\":%.2f,\"accelNorm\":%.3f,\"dropped\":%lu,"
+        "\"vertical\":%s,\"noiseFloor\":%.4f,\"innovDb\":%.4f}",
         _mpu.ok ? "true" : "false",
         _mpu.calibrating ? "true" : "false",
         _mpu.angle, _mpu.rateDps, _mpu.accelAngle, _mpu.accelNormG,
-        (unsigned long)_mpu.droppedReads, vert ? "true" : "false");
+        (unsigned long)_mpu.droppedReads, vert ? "true" : "false",
+        _mpu.gyroNoiseFloor, _mpu.accelInnovDeadband);
     _server.send(200, "application/json", buf);
 }
 
@@ -708,6 +746,17 @@ void WebUI::handleMpuCalibrate() {
     _pid.stop();
     _mpu.calibrate(_prefs);
     _server.send(200, "application/json", "{\"done\":true}");
+}
+
+void WebUI::handleMpuNoiseCal() {
+    if (!_mpu.ok)         { _server.send(503, "text/plain", "MPU not found"); return; }
+    if (_mpu.calibrating) { _server.send(409, "text/plain", "already busy"); return; }
+    _pid.stop();
+    bool ok = _mpu.characterizeNoise(_prefs);
+    char buf[100];
+    snprintf(buf, sizeof(buf), "{\"done\":%s,\"noiseFloor\":%.4f,\"innovDb\":%.4f}",
+             ok ? "true" : "false", _mpu.gyroNoiseFloor, _mpu.accelInnovDeadband);
+    _server.send(200, "application/json", buf);
 }
 
 void WebUI::handleMpuResetAngles() {
@@ -762,13 +811,15 @@ void WebUI::handleBalanceAccum() {
 
 void WebUI::handleBalanceState() {
     float sp = _pid.setpointAccum + _pid.trim;
-    char buf[360];
+    char buf[400];
     snprintf(buf, sizeof(buf),
-        "{\"running\":%s,\"error\":%.2f,\"output\":%.1f,\"spAccum\":%.2f,\"servoPos\":%d"
+        "{\"running\":%s,\"error\":%.2f,\"output\":%.1f,\"spAccum\":%.2f"
+        ",\"servoPos\":%d,\"servoTarget\":%d"
         ",\"kp\":%.4f,\"ki\":%.4f,\"kd\":%.4f,\"setpoint\":%.4f,\"accumEnabled\":%s"
         ",\"angle\":%.2f,\"rate\":%.2f,\"accelAngle\":%.2f,\"accelNorm\":%.3f,\"dropped\":%lu}",
         _pid.running ? "true" : "false",
-        sp - _mpu.angle, _pid.output, _pid.setpointAccum, _servo.targetPos,
+        sp - _mpu.angle, _pid.output, _pid.setpointAccum,
+        _servo.currentPos, _servo.targetPos,
         _pid.kp, _pid.ki, _pid.kd, _pid.trim,
         _pid.accumEnabled ? "true" : "false",
         _mpu.angle, _mpu.rateDps, _mpu.accelAngle, _mpu.accelNormG,

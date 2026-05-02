@@ -20,9 +20,22 @@ public:
     static constexpr float SAFETY_DEG           = 60.0f;
     static constexpr float ANGLE_DEADBAND_DEG   = 0.25f;
     static constexpr float RATE_DEADBAND_DPS    = 1.0f;
-    static constexpr float MAX_OUTPUT_STEP      = 2.0f;
-    static constexpr float SETPOINT_ACCUM_DIV   = 1500.0f; // matches V2
-    static constexpr float SETPOINT_ACCUM_LIMIT = 0.5f;    // matches V2
+    // CMG torque ∝ gimbal rate, not gimbal angle. 4°/cycle = 400°/s slew,
+    // which lets a fast tilt error translate into a real precession kick
+    // instead of a slow drift. ST3215 can sustain this comfortably.
+    static constexpr float MAX_OUTPUT_STEP      = 4.0f;
+    // Setpoint accumulator: slowly drifts the balance target toward the
+    // chassis's natural lean so the gimbal can recenter between
+    // disturbances. Without enough range here, the gimbal stays parked
+    // at the edge of its travel and the CMG saturates the moment a
+    // second disturbance arrives.
+    //
+    // DIV = 1000 → at output=1°, accum drifts ~0.1°/s (slow enough not to
+    //              fight the P term, fast enough to clear bias in seconds).
+    // LIMIT = 3.0 → absorbs up to 3° of mechanical bias before maxing out,
+    //              vs 0.5° before which was too tight for any real chassis.
+    static constexpr float SETPOINT_ACCUM_DIV   = 1000.0f;
+    static constexpr float SETPOINT_ACCUM_LIMIT = 3.0f;
     static constexpr float SAMPLE_TIME_S        = 0.01f;   // 10ms fixed, matches V2
     static constexpr int   SERVO_DIR            = 1;
 

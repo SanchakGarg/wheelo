@@ -67,7 +67,7 @@ void BalancePID::compute() {
     // PID_v1-equivalent integral with derivative damping from filtered gyro rate.
     const float ki_int = ki * SAMPLE_TIME_S;
     const float iError = fabsf(error) > ANGLE_DEADBAND_DEG ? error : 0.0f;
-    const float dRate  = fabsf(rate)  > RATE_DEADBAND_DPS  ? rate  : 0.0f;
+    const float dRate  = fabsf(rate)  > _mpu.gyroNoiseFloor ? rate  : 0.0f;
 
     _outputSum += ki_int * iError;
     _outputSum  = constrain(_outputSum, -OUTPUT_LIMIT, OUTPUT_LIMIT);
@@ -84,7 +84,11 @@ void BalancePID::compute() {
                                       MAX_OUTPUT_STEP);
     _prevOutput = output;
 
-    _servo.moveTo(_servo.defaultPos + SERVO_DIR * (int)(output / 0.088f));
+    // Velocity control: move servo BY `output`° from its current actual position.
+    // CMG torque ∝ gimbal rate, so each cycle we command a step from wherever the
+    // servo actually is (currentPos, read every 50ms) — not from a fixed defaultPos.
+    // This means a stalled or slipped servo gets corrected on the next position read.
+    _servo.moveTo(_servo.currentPos + SERVO_DIR * (int)(output / 0.088f));
 }
 
 void BalancePID::setGains(float newKp, float newKi, float newKd, float newTrim,
