@@ -33,6 +33,8 @@ private:
     uint8_t _addr;
     int _sda, _scl;
 
+    BiquadState _bqAx, _bqAy, _bqAz, _bqGx;
+
     float _biasAx = 0, _biasAy = 0, _biasAz = 0;
     float _biasGx = 0, _biasGy = 0, _biasGz = 0;
 
@@ -81,37 +83,39 @@ private:
     static constexpr uint8_t REG_PWR_MGMT_1 = 0x6B;
     static constexpr uint8_t REG_WHO_AM_I   = 0x75;
 
-    // DLPF 6 = 5 Hz gyro / 5 Hz accel bandwidth, ~18.6 ms group delay.
-    // Aggressive on purpose — flywheel BLDC dumps a lot of high-frequency
-    // EMF into the gyro; the complementary filter compensates for the lag
-    // by trusting the accelerometer at low frequencies.
-    static constexpr uint8_t MPU_DLPF_CFG   = 6;
+    // DLPF 5 = 10 Hz gyro / 10 Hz accel bandwidth. 
+    // We use a higher hardware bandwidth so we can use a sharper software 
+    // LP (which has better phase characteristics for control).
+    static constexpr uint8_t MPU_DLPF_CFG   = 5;
     static constexpr uint8_t MPU_SMPLRT_DIV = 9; // 1 kHz / (1 + 9) = 100 Hz
 
-    // Software gyro LP cutoff (Hz). Combined with hardware DLPF and median
-    // pre-filter this leaves rateDps essentially noise-free on the bench.
-    // 8 Hz is the sweet spot: hardware DLPF + median already kill the BLDC
-    // EMF, so the software stage only needs to take a final polish pass.
-    static constexpr float   GYRO_LP_HZ  = 8.0f;
-    // Accel needs an aggressive LP because the flywheel mechanically
-    // vibrates the chassis — that vibration shows up in Ay/Az and turns
-    // into atan2 noise that bleeds into the complementary filter output.
-    // 4 Hz here, on top of hardware DLPF=6 (5 Hz), yields ~3 Hz effective.
-    static constexpr float   ACCEL_LP_HZ = 4.0f;
+    // Software gyro LP cutoff (Hz). 
+    // 5 Hz is aggressive; it creates lag but is necessary for 3-degree noise floors.
+    static constexpr float   GYRO_LP_HZ  = 5.0f;
+    // Accel needs an extremely aggressive LP for scissored CMG vibration.
+    // 2 Hz is the 'safe' limit for balancing without falling over from lag.
+    static constexpr float   ACCEL_LP_HZ = 2.0f;
+
+    // Gyro Soft-Deadband: if (rate < GYRO_DEADBAND) then rate = 0.
+    // This stops the angle from crawling when the robot is sitting still 
+    // despite massive flywheel vibration.
+    static constexpr float   GYRO_SOFT_DEADBAND = 0.4f; 
 
     // Mahony complementary filter gains.
-    // Kp: proportional correction (deg/s per deg of innovation).
-    //     ω_c = Kp / (2π) ≈ 0.32 Hz — accel vibration above this is rejected.
-    // Ki: integral correction (builds a bias estimate that cancels thermal drift).
-    //     Steady-state angle error from ramp drift = drift_rate / Ki.
-    //     At 0.12 dps/s max drift: error = 0.12/0.30 = 0.4 deg.
-    //     Chosen to match simulation validation (sim_filter.py).
-    static constexpr float   MAHONY_KP       = 2.0f;
-    static constexpr float   MAHONY_KI       = 0.30f;
-    static constexpr float   MAX_MAHONY_INT  = 20.0f;  // dps — bias integral clamp
+    // REDUCED Kp: We trust the gyro more and the vibrating accel less.
+    // This stops the 3-degree vibration from "pulling" the angle around.
+    static constexpr float   MAHONY_KP       = 0.4f; 
+    static constexpr float   MAHONY_KI       = 0.20f;
+    static constexpr float   MAX_MAHONY_INT  = 20.0f;  
     static constexpr float   ACCEL_DIVERGE_G = 0.12f;
 
-    bool writeReg(uint8_t reg, uint8_t value);
+    // Biquad Filter State for 2nd-order noise rejection
+    struct BiquadState {
+        float x1=0, x2=0, y1=0, y2=0;
+    };
+
+    MPUSensor(uint8_t addr, int sda, int scl);
+
     bool readReg(uint8_t reg, uint8_t &value);
     bool rawRead(int16_t out[7]);
     void resetFilters();

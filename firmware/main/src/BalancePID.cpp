@@ -79,10 +79,20 @@ void BalancePID::compute() {
     }
 
     desired = constrain(desired, -OUTPUT_LIMIT, OUTPUT_LIMIT);
-    output = _prevOutput + constrain(desired - _prevOutput,
-                                     -MAX_OUTPUT_STEP,
-                                      MAX_OUTPUT_STEP);
-    _prevOutput = output;
+    
+    // Output Gating / Deadzone:
+    // Only update the actual 'output' (which drives the servo) if the 'desired' 
+    // change is larger than our noise deadzone. This stops the robot from 
+    // "buzzing" when it's just sitting there vibrating.
+    if (fabsf(desired - _prevOutput) > SERVO_DEADZONE_DEG) {
+        output = _prevOutput + constrain(desired - _prevOutput,
+                                         -MAX_OUTPUT_STEP,
+                                          MAX_OUTPUT_STEP);
+        _prevOutput = output;
+    } else {
+        // Change is too small (likely noise) — stay put.
+        output = _prevOutput;
+    }
 
     // Velocity control: move servo BY `output`° from its current actual position.
     // CMG torque ∝ gimbal rate, so each cycle we command a step from wherever the

@@ -5,6 +5,27 @@
 MPUSensor::MPUSensor(uint8_t addr, int sda, int scl)
     : _addr(addr), _sda(sda), _scl(scl) {}
 
+// 2nd-order Butterworth Low-Pass Biquad. 
+// Sharp -40dB/decade roll-off to kill scissored-CMG vibration.
+static float biquadLP(float x, float cutoffHz, float dt, MPUSensor::BiquadState &s) {
+    float wc = 2.0f * 3.14159265f * cutoffHz;
+    float k = wc * dt / 2.0f;
+    float k2 = k * k;
+    float sqrt2 = 1.41421356f;
+    float norm = 1.0f / (1.0f + sqrt2 * k + k2);
+    
+    float b0 = k2 * norm;
+    float b1 = 2.0f * b0;
+    float b2 = b0;
+    float a1 = 2.0f * (k2 - 1.0f) * norm;
+    float a2 = (1.0f - sqrt2 * k + k2) * norm;
+
+    float y = b0*x + b1*s.x1 + b2*s.x2 - a1*s.y1 - a2*s.y2;
+    s.x2 = s.x1; s.x1 = x;
+    s.y2 = s.y1; s.y1 = y;
+    return y;
+}
+
 static float lowPass(float prev, float x, float cutoffHz, float dt) {
     const float rc = 1.0f / (2.0f * 3.1415926535f * cutoffHz);
     const float alpha = constrain(dt / (rc + dt), 0.0f, 1.0f);
@@ -186,69 +207,75 @@ bool MPUSensor::read() {
     _accelNormFilt = lowPass(_accelNormFilt, accelNormG, 1.5f, dt);
 
     if (!_cfInited) {
-        _eAx = rax;
-        _eAy = ray;
-        _eAz = raz;
-        _eGx = rgx;
+        _eAx = rax; _eAy = ray; _eAz = raz; _eGx = rgx;
+        _bqAx.x1 = _bqAx.x2 = rax; _bqAx.y1 = _bqAx.y2 = rax;
+        _bqAy.x1 = _bqAy.x2 = ray; _bqAy.y1 = _bqAy.y2 = ray;
+        _bqAz.x1 = _bqAz.x2 = raz; _bqAz.y1 = _bqAz.y2 = raz;
+        _bqGx.x1 = _bqGx.x2 = rgx; _bqGx.y1 = _bqGx.y2 = rgx;
         accelAngle = atan2f(_eAy, _eAz) * 57.2957795f;
         _cfAngle = accelAngle;
         _cfInited = true;
     } else {
-        _eAx = lowPass(_eAx, rax, ACCEL_LP_HZ, dt);
-        _eAy = lowPass(_eAy, ray, ACCEL_LP_HZ, dt);
-        _eAz = lowPass(_eAz, raz, ACCEL_LP_HZ, dt);
-        _eGx = lowPass(_eGx, rgx, GYRO_LP_HZ,  dt);
-        accelAngle = atan2f(_eAy, _eAz) * 57.2957795f;
+        _eAx = biquadLP(rax, ACCEL_LP_HZ, dt, _bqAx);
+        _eAy = biquadLP(ray, ACCEL_LP_HZ, dt, _bqAy);
+        _eAz = biquadLP(raz, ACCEL_LP_HZ, dt, _bqAz);
+        _eGx = biquadLP(rgx, GYRO_LP_HZ,  dt, _bqGx);
     }
 
-    // rateDps: deadbanded for PID derivative and dashboard display only.
-    // Mahony integration below uses _eGx directly (no deadband).
-    rateDps = (fabsf(_eGx) < gyroNoiseFloor) ? 0.0f : _eGx;
+    // LP-filtered gyro with a soft deadband. If the rotation is below the 
+    // noise floor (e.g. 0.4 deg/s), we treat it as exactly 0 to stop drift.
+    float cleanGx = _eGx;
+    if (fabsf(cleanGx) < GYRO_SOFT_DEADBAND) cleanGx = 0.0f;
+    
+    rateDps = (fabsf(cleanGx) < gyroNoiseFloor) ? 0.0f : cleanGx;
 
     // ── Mahony complementary filter ────────────────────────────────────────
-    // Replaces the hard innovation deadband + slow bias tracker.
-    // Simulation (sim_filter.py) shows 1.4x RMSE improvement over the
-    // deadband CF at the same thermal drift rate (0.12 dps/s ramp).
-    //
-    // Kp: proportional pull toward accel — rejects drift that's already
-    //     accumulated in the angle (steady-state error = drift_dps/Kp).
-    // Ki: integral correction — builds a running bias estimate so that
-    //     the gyro integration itself converges (steady-state error from
-    //     ramp drift = drift_rate/Ki = 0.12/0.30 ≈ 0.4 deg).
-    // No hard deadband: BLDC vibration is rejected by the 4 Hz accel LP
-    // and the 0.32 Hz Mahony crossover, not by gating.
-
-    // Scale trust when accel norm deviates (robot is really accelerating).
+    // Gated Mahony: We only update the 'Ki' (bias integral) when the robot is
+    // relatively stable. If we are vibrating or rotating fast, we freeze
+    // the bias estimate so it doesn't get poisoned by vibration.
     float kp = MAHONY_KP;
     float ki = MAHONY_KI;
     const float norm3 = sqrtf(_eAx * _eAx + _eAy * _eAy + _eAz * _eAz);
+    
+    // Stability gating logic: only track bias if gyro is near-zero AND 
+    // accel is near 1g. This prevents vibration from causing 'crawling'.
+    bool stable = (fabsf(cleanGx) < 2.0f) && (fabsf(_accelNormFilt - 1.0f) < 0.05f);
+
     if (norm3 < 0.3f) {
-        // Wildly invalid accel — pure gyro integration this sample.
         kp = 0.0f; ki = 0.0f;
     } else if (fabsf(_accelNormFilt - 1.0f) > ACCEL_DIVERGE_G) {
-        // Real acceleration event (impact/fall) — reduce but don't freeze.
-        kp *= 0.15f; ki *= 0.15f;
+        kp *= 0.15f; ki = 0.0f; // Freeze Ki during high acceleration
     }
+    
+    if (!stable) ki = 0.0f; // Freeze bias tracking if vibrating/moving
 
     if (norm3 > 0.1f) {
-        // Normalize LP-filtered accel and compute cross-product innovation.
-        // e_deg ≈ accel_angle - _cfAngle for small angles; exact for large.
+        // Compute cross-product innovation.
         const float ay_n  = _eAy / norm3;
         const float az_n  = _eAz / norm3;
-        const float th    = _cfAngle * 0.017453292f;   // deg to rad
+        const float th    = _cfAngle * 0.017453292f;
         const float e_deg = (ay_n * cosf(th) - az_n * sinf(th)) * 57.2957795f;
 
-        // Integral: online bias estimate in dps (converges to −thermal_drift).
+        // Integral: builds online bias estimate in dps.
         _mahonyInt += ki * e_deg * dt;
         _mahonyInt  = constrain(_mahonyInt, -MAX_MAHONY_INT, MAX_MAHONY_INT);
 
-        // Integrate: LP-filtered gyro + proportional correction + bias estimate.
-        _cfAngle += (_eGx + kp * e_deg + _mahonyInt) * dt;
+        // Integrate: Gyro + proportional correction + bias estimate.
+        _cfAngle += (cleanGx + kp * e_deg + _mahonyInt) * dt;
     } else {
-        _cfAngle += _eGx * dt;   // no valid accel — pure gyro
+        _cfAngle += cleanGx * dt;
     }
 
-    angle = _cfAngle + angleOffset;
+    float finalAngle = _cfAngle + angleOffset;
+    
+    // Hysteresis: If the angle changed by less than 0.1 deg since last loop,
+    // and we are very close to zero, just hold the previous value.
+    if (fabsf(finalAngle - angle) < 0.1f && fabsf(finalAngle) < 0.2f) {
+        // stay with current 'angle'
+    } else {
+        angle = finalAngle;
+    }
+    
     return true;
 }
 

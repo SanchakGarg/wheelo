@@ -36,8 +36,12 @@ public:
     //              vs 0.5° before which was too tight for any real chassis.
     static constexpr float SETPOINT_ACCUM_DIV   = 1000.0f;
     static constexpr float SETPOINT_ACCUM_LIMIT = 3.0f;
-    static constexpr float SAMPLE_TIME_S        = 0.01f;   // 10ms fixed, matches V2
-    static constexpr int   SERVO_DIR            = 1;
+    static constexpr float   SAMPLE_TIME_S        = 0.01f;   // 10ms fixed, matches V2
+    static constexpr int     SERVO_DIR            = 1;
+    // Servo Output Deadzone: if the PID output change is less than this, 
+    // don't move the servo. Prevents noise from chattering the gears.
+    static constexpr float   SERVO_DEADZONE_DEG   = 0.15f; 
+
 
     BalancePID(ServoController& servo, MPUSensor& mpu);
 
