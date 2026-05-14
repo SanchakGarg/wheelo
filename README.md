@@ -63,7 +63,7 @@ Wheelo/
 
 ### CAD
 
-The mechanical design is available on Onshape: **[Insert Onshape Link Here]**
+The mechanical design is available on Onshape: **[Wheelo CAD](https://cad.onshape.com/documents/1c7d4ff26d1dc69175c3ae98/w/5cd2b66e5aeb4751e0f29f10/e/76622d04818cc6738350398c)**
 
 ## Firmware Architecture
 
