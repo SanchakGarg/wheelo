@@ -222,47 +222,55 @@ bool MPUSensor::read() {
         _eGx = biquadLP(rgx, GYRO_LP_HZ,  dt, _bqGx);
     }
 
-    // LP-filtered gyro with a soft deadband. If the rotation is below the 
-    // noise floor (e.g. 0.4 deg/s), we treat it as exactly 0 to stop drift.
-    float cleanGx = _eGx;
-    if (fabsf(cleanGx) < GYRO_SOFT_DEADBAND) cleanGx = 0.0f;
+    // ── Moving Average (MA) ────────────────────────────────────────────────
+    _gxMA[_maIdx] = _eGx;
+    _maIdx = (_maIdx + 1) % 4;
+    float avgGx = (_gxMA[0] + _gxMA[1] + _gxMA[2] + _gxMA[3]) / 4.0f;
+
+    // LP-filtered gyro with a dynamic deadband based on noise calibration.
+    // We use 1.2x the measured 3σ floor to ensure absolute zero at idle.
+    float cleanGx = avgGx;
+    float dynamicDeadband = max(GYRO_SOFT_DEADBAND, gyroNoiseFloor * 1.2f);
+    if (fabsf(cleanGx) < dynamicDeadband) cleanGx = 0.0f;
     
     rateDps = (fabsf(cleanGx) < gyroNoiseFloor) ? 0.0f : cleanGx;
 
+    // ── Stillness Lock ─────────────────────────────────────────────────────
+    // If we detect consistent zero-rate for 200ms, we FORCE the integrator
+    // to stop. This ensures "Absolute Zero" at idle despite vibration.
+    if (cleanGx == 0.0f) {
+        if (_stillCount < STILL_THRESHOLD_SAMPLES) _stillCount++;
+    } else {
+        _stillCount = 0;
+    }
+    bool locked = (_stillCount >= STILL_THRESHOLD_SAMPLES);
+
     // ── Mahony complementary filter ────────────────────────────────────────
-    // Gated Mahony: We only update the 'Ki' (bias integral) when the robot is
-    // relatively stable. If we are vibrating or rotating fast, we freeze
-    // the bias estimate so it doesn't get poisoned by vibration.
     float kp = MAHONY_KP;
     float ki = MAHONY_KI;
     const float norm3 = sqrtf(_eAx * _eAx + _eAy * _eAy + _eAz * _eAz);
     
-    // Stability gating logic: only track bias if gyro is near-zero AND 
-    // accel is near 1g. This prevents vibration from causing 'crawling'.
     bool stable = (fabsf(cleanGx) < 2.0f) && (fabsf(_accelNormFilt - 1.0f) < 0.05f);
 
-    if (norm3 < 0.3f) {
+    if (locked || norm3 < 0.3f) {
         kp = 0.0f; ki = 0.0f;
     } else if (fabsf(_accelNormFilt - 1.0f) > ACCEL_DIVERGE_G) {
-        kp *= 0.15f; ki = 0.0f; // Freeze Ki during high acceleration
+        kp *= 0.15f; ki = 0.0f;
     }
     
-    if (!stable) ki = 0.0f; // Freeze bias tracking if vibrating/moving
+    if (!stable) ki = 0.0f; 
 
-    if (norm3 > 0.1f) {
-        // Compute cross-product innovation.
+    if (norm3 > 0.1f && !locked) {
         const float ay_n  = _eAy / norm3;
         const float az_n  = _eAz / norm3;
         const float th    = _cfAngle * 0.017453292f;
         const float e_deg = (ay_n * cosf(th) - az_n * sinf(th)) * 57.2957795f;
 
-        // Integral: builds online bias estimate in dps.
         _mahonyInt += ki * e_deg * dt;
         _mahonyInt  = constrain(_mahonyInt, -MAX_MAHONY_INT, MAX_MAHONY_INT);
 
-        // Integrate: Gyro + proportional correction + bias estimate.
         _cfAngle += (cleanGx + kp * e_deg + _mahonyInt) * dt;
-    } else {
+    } else if (!locked) {
         _cfAngle += cleanGx * dt;
     }
 
@@ -371,8 +379,12 @@ bool MPUSensor::characterizeNoise(Preferences& prefs, int samples) {
             raz = median5(medAz[0], medAz[1], medAz[2], medAz[3], medAz[4]);
         }
 
-        const float rcG  = 1.0f / (2.0f * 3.1415926535f * GYRO_LP_HZ);
-        filtGx += constrain(dt / (rcG + dt), 0.0f, 1.0f) * (rgx - filtGx);
+        // Apply the EXACT same filter chain as read() to get an accurate noise floor.
+        rgx = biquadLP(rgx, GYRO_LP_HZ, dt, _bqGx);
+        
+        float maSum = rgx;
+        for(int i=0; i<3; i++) maSum += _gxMA[i];
+        float filtGx = maSum / 4.0f;
 
         const float rcA  = 1.0f / (2.0f * 3.1415926535f * ACCEL_LP_HZ);
         const float alpA = constrain(dt / (rcA + dt), 0.0f, 1.0f);

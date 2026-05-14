@@ -73,7 +73,15 @@ private:
 
     static constexpr float   GYRO_LP_HZ  = 5.0f;
     static constexpr float   ACCEL_LP_HZ = 2.0f;
-    static constexpr float   GYRO_SOFT_DEADBAND = 0.4f; 
+    static constexpr float   GYRO_SOFT_DEADBAND = 0.6f; // Increased for high-vibe CMG
+
+    // Stillness Lock: if gyro is quiet for 20 samples (200ms), lock the angle.
+    uint16_t _stillCount = 0;
+    static constexpr uint16_t STILL_THRESHOLD_SAMPLES = 20;
+
+    // Moving Average Buffer to kill the "oscillation pattern"
+    float _gxMA[4] = {0};
+    uint8_t _maIdx = 0;
 
     static constexpr float   MAHONY_KP       = 0.4f; 
     static constexpr float   MAHONY_KI       = 0.20f;
